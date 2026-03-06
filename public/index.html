@@ -129,16 +129,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <nav class="nav">
   <div class="nav-inner">
     <div class="logo">
-      <span style="font-size:32px">🧵</span>
-      <div><h1>ThreadsCollector</h1><p>Meta Threads 빅데이터 수집 & 분석 플랫폼</p></div>
+      <span style="font-size:32px">ð§µ</span>
+      <div><h1>ThreadsCollector</h1><p>Meta Threads ë¹ë°ì´í° ìì§ & ë¶ì íë«í¼</p></div>
     </div>
     <div class="nav-right">
-      <button class="collect-btn" id="collectBtn" onclick="runCollect()">🚀 수집하기</button>
+      <button class="collect-btn" id="collectBtn" onclick="runCollect()">ð ìì§íê¸°</button>
       <div class="status-badge running" id="statusBadge">
         <span class="status-dot on" id="statusDot"></span>
-        <span id="statusText">대기 중</span>
+        <span id="statusText">ëê¸° ì¤</span>
       </div>
-      <div class="last-info" id="lastInfo">⏱️ 마지막 수집: -</div>
+      <div class="last-info" id="lastInfo">â±ï¸ ë§ì§ë§ ìì§: -</div>
     </div>
   </div>
 </nav>
@@ -147,32 +147,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="stats-row" id="statsRow"></div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="feed" onclick="switchTab('feed')">📋 피드</button>
-    <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">📊 분석</button>
+    <button class="tab-btn active" data-tab="feed" onclick="switchTab('feed')">ð í¼ë</button>
+    <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">ð ë¶ì</button>
   </div>
 
   <div id="feedTab">
     <div class="filters">
       <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="키워드, 유저명으로 검색..." oninput="applyFilters()">
+        <span class="search-icon">ð</span>
+        <input type="text" id="searchInput" placeholder="í¤ìë, ì ì ëªì¼ë¡ ê²ì..." oninput="applyFilters()">
       </div>
       <div class="cat-btns">
-        <button class="cat-btn active" data-cat="all" onclick="setCategory('all')">전체</button>
-        <button class="cat-btn" data-cat="shopping" onclick="setCategory('shopping')">🛒 쇼핑</button>
-        <button class="cat-btn" data-cat="issue" onclick="setCategory('issue')">📰 이슈</button>
-        <button class="cat-btn" data-cat="personal" onclick="setCategory('personal')">👤 퍼스널</button>
+        <button class="cat-btn active" data-cat="all" onclick="setCategory('all')">ì ì²´</button>
+        <button class="cat-btn" data-cat="shopping" onclick="setCategory('shopping')">ð ì¼í</button>
+        <button class="cat-btn" data-cat="issue" onclick="setCategory('issue')">ð° ì´ì</button>
+        <button class="cat-btn" data-cat="personal" onclick="setCategory('personal')">ð¤ í¼ì¤ë</button>
       </div>
     </div>
     <div class="content-grid">
       <div>
         <div class="list-header">
-          <span id="threadCount">0개 스레드 표시 중</span>
+          <span id="threadCount">0ê° ì¤ë ë íì ì¤</span>
           <select id="sortSelect" onchange="applyFilters()">
-            <option value="latest">최신순</option>
-            <option value="popular">인기순</option>
-            <option value="engagement">참여율순</option>
-            <option value="replies">댓글수순</option>
+            <option value="latest">ìµì ì</option>
+            <option value="popular">ì¸ê¸°ì</option>
+            <option value="engagement">ì°¸ì¬ì¨ì</option>
+            <option value="replies">ëê¸ìì</option>
           </select>
         </div>
         <div class="thread-list" id="threadList"></div>
