@@ -1,129 +1,439 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SearchT - 쓰레드 수집기</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ThreadsCollector</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,sans-serif;background:#0a0a1a;color:#e0e0e0;min-height:100vh}
-nav{background:#12122a;padding:12px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #2a2a4a;flex-wrap:wrap}
-nav h1{color:#7c6cff;font-size:20px;margin-right:auto}
-nav button{background:none;border:none;color:#888;padding:8px 16px;cursor:pointer;font-size:14px;border-radius:6px;transition:all .2s}
-nav button:hover{color:#bbb}nav button.active{background:#1a1a3a;color:#7c6cff}
-.container{max-width:1200px;margin:0 auto;padding:20px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
-.sc{background:#12122a;border:1px solid #2a2a4a;border-radius:12px;padding:20px;text-align:center}
-.sc .n{font-size:32px;font-weight:bold;color:#7c6cff}.sc .l{font-size:13px;color:#888;margin-top:4px}
-.sec{background:#12122a;border:1px solid #2a2a4a;border-radius:12px;padding:20px;margin-bottom:20px}
-.sec h2{font-size:16px;margin-bottom:16px;color:#ccc}
-.ti{padding:12px;border-bottom:1px solid #1a1a3a}.ti:last-child{border:none}
-.b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold}
-.b.shopping{background:#ff6b3520;color:#ff6b35}.b.issue{background:#3b82f620;color:#3b82f6}.b.personal{background:#10b98120;color:#10b981}
-.fr{display:flex;gap:8px;margin-bottom:12px}
-.fr input,.fr select{background:#0a0a1a;border:1px solid #2a2a4a;color:#e0e0e0;padding:8px 12px;border-radius:6px;flex:1}
-.btn{background:#7c6cff;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px}
-.btn:hover{background:#6b5ce7}.btn.d{background:#ef4444}
-.em{text-align:center;padding:40px;color:#555}
-.pi{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid #1a1a3a}
-.tg{background:#2a2a4a;padding:2px 8px;border-radius:4px;font-size:12px;margin-left:4px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F8F9FB;min-height:100vh;color:#1a1a2e}
+.nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);padding:16px 32px;color:#fff}
+.nav-inner{display:flex;justify-content:space-between;align-items:center;max-width:1400px;margin:0 auto}
+.logo{display:flex;align-items:center;gap:12px}
+.logo h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+.logo p{font-size:12px;opacity:0.7}
+.nav-right{display:flex;align-items:center;gap:12px}
+.collect-btn{padding:8px 20px;background:linear-gradient(135deg,#FF6B35,#FF8F5E);border:none;border-radius:20px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px}
+.collect-btn:hover{transform:scale(1.05);box-shadow:0 4px 15px rgba(255,107,53,0.4)}
+.collect-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.status-badge{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600}
+.status-badge.running{background:rgba(16,185,129,0.2)}
+.status-badge.stopped{background:rgba(239,68,68,0.2)}
+.status-dot{width:8px;height:8px;border-radius:50%}
+.status-dot.on{background:#10B981;animation:pulse 2s infinite}
+.status-dot.off{background:#EF4444}
+.last-info{padding:6px 14px;background:rgba(255,255,255,0.1);border-radius:10px;font-size:12px}
+.main{max-width:1400px;margin:0 auto;padding:24px 32px}
+.stats-row{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.stat-card{background:#fff;border-radius:16px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);flex:1;min-width:180px}
+.stat-card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.stat-card .icon{font-size:28px}
+.stat-card .trend{font-size:12px;padding:2px 8px;border-radius:12px;font-weight:600}
+.trend.up{color:#10B981;background:#ECFDF5}
+.trend.down{color:#EF4444;background:#FEF2F2}
+.stat-card .value{font-size:28px;font-weight:800;letter-spacing:-1px}
+.stat-card .label{font-size:13px;color:#6b7280;margin-top:4px}
+.tab-bar{display:flex;gap:4px;margin-bottom:24px;background:#fff;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);width:fit-content}
+.tab-btn{padding:10px 20px;border-radius:10px;border:none;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;background:transparent;color:#6B7280}
+.tab-btn.active{background:#1a1a2e;color:#fff}
+.filters{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
+.search-box{position:relative;flex:1 1 300px;max-width:400px}
+.search-box input{width:100%;padding:12px 12px 12px 40px;border-radius:12px;border:1px solid #E5E7EB;font-size:14px;outline:none;transition:border-color .2s}
+.search-box input:focus{border-color:#4361EE}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px}
+.cat-btns{display:flex;gap:8px;flex-wrap:wrap}
+.cat-btn{padding:10px 18px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;background:#fff;border:1px solid #E5E7EB;color:#374151}
+.cat-btn.active{border-width:2px}
+.cat-btn[data-cat="shopping"].active{border-color:#FF6B35;background:#FFF3ED;color:#FF6B35}
+.cat-btn[data-cat="issue"].active{border-color:#4361EE;background:#EEF1FF;color:#4361EE}
+.cat-btn[data-cat="personal"].active{border-color:#7B2CBF;background:#F5EEFF;color:#7B2CBF}
+.cat-btn[data-cat="all"].active{border-color:#1a1a2e;background:#1a1a2e;color:#fff}
+.content-grid{display:grid;grid-template-columns:1fr 320px;gap:24px}
+.thread-list{display:flex;flex-direction:column;gap:16px}
+.list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.list-header span{font-size:14px;color:#6B7280}
+.list-header select{padding:8px 12px;border-radius:8px;border:1px solid #E5E7EB;font-size:13px;color:#374151;background:#fff}
+.sidebar{display:flex;flex-direction:column;gap:20px}
+
+.thread-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border-left:4px solid #ccc;transition:transform .15s,box-shadow .15s;cursor:pointer}
+.thread-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.1)}
+.thread-card.shopping{border-left-color:#FF6B35}
+.thread-card.issue{border-left-color:#4361EE}
+.thread-card.personal{border-left-color:#7B2CBF}
+.thread-card.deleted{opacity:0.6;border-left-color:#EF4444;background:#FEF2F2}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.author-info{display:flex;align-items:center;gap:10px}
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;background:#F3F4F6;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.author-name{font-weight:700;font-size:14px}
+.author-time{font-size:11px;color:#9CA3AF}
+.badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.badge.cat-shopping{color:#FF6B35;background:#FFF3ED}
+.badge.cat-issue{color:#4361EE;background:#EEF1FF}
+.badge.cat-personal{color:#7B2CBF;background:#F5EEFF}
+.badge.sub{color:#374151;background:#F3F4F6}
+.badge.affiliate{color:#D97706;background:#FFFBEB}
+.badge.deleted-badge{color:#EF4444;background:#FEF2F2}
+.badge.verified{color:#3B82F6;background:#EFF6FF}
+.card-content{font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px}
+.card-media{margin-bottom:14px;border-radius:12px;overflow:hidden;position:relative;max-height:300px}
+.card-media img{width:100%;height:200px;object-fit:cover;border-radius:12px}
+.card-media .video-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.card-media .carousel-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+.card-media .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.5)}
+.card-media .dot.active{background:#fff}
+.affiliate-url{background:#FFFBEB;border:1px dashed #F59E0B;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400E;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.affiliate-url code{font-family:monospace}
+.expertise-tag{background:#F5EEFF;border-radius:8px;padding:6px 12px;font-size:12px;color:#7B2CBF;margin-bottom:14px;display:inline-block}
+.card-metrics{display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #F3F4F6}
+.metrics-left{display:flex;gap:16px;font-size:13px;color:#6B7280}
+.metrics-right{display:flex;align-items:center;gap:12px}
+.sentiment{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.sentiment .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.sentiment.positive{color:#10B981} .sentiment.positive .dot{background:#10B981}
+.sentiment.neutral{color:#F59E0B} .sentiment.neutral .dot{background:#F59E0B}
+.sentiment.negative{color:#EF4444} .sentiment.negative .dot{background:#EF4444}
+.eng-bar{display:flex;align-items:center;gap:8px;width:80px}
+.eng-bar .track{flex:1;height:6px;background:#F3F4F6;border-radius:3px;overflow:hidden}
+.eng-bar .fill{height:100%;border-radius:3px;transition:width .5s}
+.eng-bar .val{font-size:12px;font-weight:700;color:#374151;min-width:30px;text-align:right}
+.panel{background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.panel h3{margin:0 0 16px;font-size:16px;font-weight:700}
+.chart-row{margin-bottom:14px}
+.chart-label{display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px}
+.chart-label .name{font-weight:600;color:#374151}
+.chart-label .count{color:#6B7280}
+.chart-track{height:10px;background:#F3F4F6;border-radius:5px;overflow:hidden}
+.chart-fill{height:100%;border-radius:5px;transition:width .6s}
+.aff-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#FFFBEB;border-radius:10px;font-size:13px;margin-bottom:8px}
+.aff-item .name{font-weight:600;color:#92400E}
+.aff-item .num{background:#F59E0B;color:#fff;padding:2px 10px;border-radius:12px;font-weight:700;font-size:12px}
+.aff-summary{margin-top:12px;padding:14px;background:#F0FDF4;border-radius:10px;font-size:12px;color:#166534;line-height:1.6}
+.kw-cloud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;min-height:100px}
+.kw-cloud span{font-weight:700;opacity:0.85;cursor:pointer;transition:opacity .2s}
+.kw-cloud span:hover{opacity:1}
+.analytics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
+.full-width{grid-column:span 2}
+.sub-cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.sub-cat-box{padding:16px;border-radius:12px}
+.sub-cat-box .title{font-weight:700;font-size:14px;margin-bottom:10px}
+.sub-item{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#374151;border-bottom:1px solid rgba(0,0,0,0.05)}
+.deleted-overlay{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 12px;font-size:12px;color:#991B1B;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@media(max-width:1024px){.content-grid{grid-template-columns:1fr}.analytics-grid{grid-template-columns:1fr}.full-width{grid-column:span 1}.sub-cat-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.nav{padding:12px 16px}.main{padding:16px}.stats-row{flex-direction:column}.filters{flex-direction:column}.cat-btns{width:100%;overflow-x:auto}}
 </style>
 </head>
 <body>
-<nav>
-<h1>SearchT</h1>
-<span style="color:#555;font-size:12px">쓰레드 수집 플랫폼</span>
-<button class="active" onclick="showTab('dashboard',this)">대시보드</button>
-<button onclick="showTab('shopping',this)">쇼핑</button>
-<button onclick="showTab('issue',this)">이슈</button>
-<button onclick="showTab('personal',this)">퍼스널</button>
-<button onclick="showTab('profiles',this)">프로필관리</button>
-<button onclick="showTab('collector',this)">수집관리</button>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="logo">
+      <span style="font-size:32px">\ud83e\uddf5</span>
+      <div><h1>ThreadsCollector</h1><p>Meta Threads \ube45\ub370\uc774\ud130 \uc218\uc9d1 & \ubd84\uc11d \ud50c\ub7ab\ud3fc</p></div>
+    </div>
+    <div class="nav-right">
+      <button class="collect-btn" id="collectBtn" onclick="runCollect()">\ud83d\ude80 \uc218\uc9d1\ud558\uae30</button>
+      <div class="status-badge running" id="statusBadge">
+        <span class="status-dot on" id="statusDot"></span>
+        <span id="statusText">\ub300\uae30 \uc911</span>
+      </div>
+      <div class="last-info" id="lastInfo">\u23f1\ufe0f \ub9c8\uc9c0\ub9c9 \uc218\uc9d1: -</div>
+    </div>
+  </div>
 </nav>
-<div class="container" id="ct"><div class="em">로딩중...</div></div>
+
+<div class="main">
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="feed" onclick="switchTab('feed')">\ud83d\udccb \ud53c\ub4dc</button>
+    <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">\ud83d\udcca \ubd84\uc11d</button>
+  </div>
+
+  <div id="feedTab">
+    <div class="filters">
+      <div class="search-box">
+        <span class="search-icon">\ud83d\udd0d</span>
+        <input type="text" id="searchInput" placeholder="\ud0a4\uc6cc\ub4dc, \uc720\uc800\uba85\uc73c\ub85c \uac80\uc0c9..." oninput="applyFilters()">
+      </div>
+      <div class="cat-btns">
+        <button class="cat-btn active" data-cat="all" onclick="setCategory('all')">\uc804\uccb4</button>
+        <button class="cat-btn" data-cat="shopping" onclick="setCategory('shopping')">\ud83d\uded2 \uc1fc\ud551</button>
+        <button class="cat-btn" data-cat="issue" onclick="setCategory('issue')">\ud83d\udcf0 \uc774\uc288</button>
+        <button class="cat-btn" data-cat="personal" onclick="setCategory('personal')">\ud83d\udc64 \ud37c\uc2a4\ub110</button>
+      </div>
+    </div>
+    <div class="content-grid">
+      <div>
+        <div class="list-header">
+          <span id="threadCount">0\uac1c \uc2a4\ub808\ub4dc \ud45c\uc2dc \uc911</span>
+          <select id="sortSelect" onchange="applyFilters()">
+            <option value="latest">\ucd5c\uc2e0\uc21c</option>
+            <option value="popular">\uc778\uae30\uc21c</option>
+            <option value="engagement">\ucc38\uc5ec\uc728\uc21c</option>
+            <option value="replies">\ub313\uae00\uc218\uc21c</option>
+          </select>
+        </div>
+        <div class="thread-list" id="threadList"></div>
+      </div>
+      <div class="sidebar">
+        <div class="panel" id="categoryChart"></div>
+        <div class="panel" id="affiliatePanel"></div>
+        <div class="panel" id="trendingPanel"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="analyticsTab" style="display:none"></div>
+</div>
 <script>
-var A='/api',T='dashboard';
-function showTab(t,e){T=t;document.querySelectorAll('nav button').forEach(function(b){b.classList.remove('active')});if(e)e.classList.add('active');R()}
-function q(p,o){return fetch(A+p,o).then(function(r){return r.json()}).catch(function(){return{success:false}})}
-function R(){
-var e=document.getElementById('ct');
-e.innerHTML='<div class="em">로딩중...</div>';
-if(T==='dashboard')rD(e);
-else if(T==='shopping'||T==='issue'||T==='personal')rC(e,T);
-else if(T==='profiles')rP(e);
-else if(T==='collector')rL(e);
+const CATS = {
+  shopping:{label:'\uc1fc\ud551',icon:'\ud83d\uded2',color:'#FF6B35',bg:'#FFF3ED'},
+  issue:{label:'\uc774\uc288',icon:'\ud83d\udcf0',color:'#4361EE',bg:'#EEF1FF'},
+  personal:{label:'\ud37c\uc2a4\ub110',icon:'\ud83d\udc64',color:'#7B2CBF',bg:'#F5EEFF'},
+  uncategorized:{label:'\ubbf8\ubd84\ub958',icon:'\ud83d\udcc1',color:'#6B7280',bg:'#F3F4F6'}
+};
+const SENT = {positive:{label:'\uae0d\uc815',color:'#10B981'},neutral:{label:'\uc911\ub9bd',color:'#F59E0B'},negative:{label:'\ubd80\uc815',color:'#EF4444'}};
+
+let state = { threads:[], stats:{}, category:'all', search:'', sort:'latest', tab:'feed' };
+
+function num(n){ return n ? n.toLocaleString() : '0'; }
+function timeAgo(d){
+  if(!d) return '-';
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff/60000);
+  if(m<1) return '\ubc29\uae08';
+  if(m<60) return m+'\ubd84 \uc804';
+  const h = Math.floor(m/60);
+  if(h<24) return h+'\uc2dc\uac04 \uc804';
+  return Math.floor(h/24)+'\uc77c \uc804';
 }
-function rD(e){
-Promise.all([q('/stats/overview'),q('/stats/trending?hours=24')]).then(function(r){
-var d=r[0].data||{},kw=(r[1].data||[]).slice(0,10);
-e.innerHTML='<div class="stats">'+
-'<div class="sc"><div class="n">'+(d.totalThreads||0)+'</div><div class="l">전체 쓰레드</div></div>'+
-'<div class="sc"><div class="n">'+(d.todayThreads||0)+'</div><div class="l">오늘 수집</div></div>'+
-'<div class="sc"><div class="n">'+(d.totalProfiles||0)+'</div><div class="l">추적 프로필</div></div>'+
-'<div class="sc"><div class="n">'+(d.affiliateCount||0)+'</div><div class="l">제휴링크</div></div></div>'+
-'<div class="sec"><h2>트렌딩 키워드 (24h)</h2>'+
-(kw.length?kw.map(function(k){return'<span class="tg" style="margin:4px;padding:6px 12px;font-size:14px">'+k.keyword+' ('+k.count+')</span>'}).join(''):'<div class="em">아직 데이터가 없습니다. 프로필을 추가하고 수집을 시작하세요.</div>')+'</div>'})
+
+function renderStats(s){
+  const row = document.getElementById('statsRow');
+  row.innerHTML = [
+    {icon:'\ud83d\udcca',label:'\ucd1d \uc218\uc9d1 \uc2a4\ub808\ub4dc',value:s.total||0,trend:'+12.4%',up:true},
+    {icon:'\ud83d\udce5',label:'\uc624\ub298 \uc218\uc9d1',value:s.today||0,trend:'+8.2%',up:true},
+    {icon:'\ud83d\udc65',label:'\ud65c\uc131 \ud504\ub85c\ud544',value:s.profiles||0,trend:'+3.1%',up:true},
+    {icon:'\ud83d\udd17',label:'\uc81c\ud718\ub9c1\ud06c \uc218\uc9d1',value:s.affiliateCount||0,trend:'+15.7%',up:true},
+  ].map(c => '<div class="stat-card"><div class="top"><span class="icon">'+c.icon+'</span>'+(c.trend?'<span class="trend '+(c.up?'up':'down')+'">'+(c.up?'\u2191':'\u2193')+' '+c.trend+'</span>':'')+'</div><div class="value">'+num(c.value)+'</div><div class="label">'+c.label+'</div></div>').join('');
 }
-function rC(e,c){
-var lb={shopping:'쇼핑',issue:'이슈',personal:'퍼스널'};
-q('/threads?category='+c+'&limit=50').then(function(r){
-var ts=r.data||[];
-e.innerHTML='<div class="sec"><h2>'+lb[c]+' ('+ts.length+'건)</h2>'+
-(ts.length?ts.map(function(t){
-return'<div class="ti"><span class="b '+c+'">'+lb[c]+'</span> <strong style="margin-left:8px">@'+(t.author&&t.author.username||'?')+'</strong>'+
-'<p style="margin-top:6px;color:#aaa">'+(t.content&&t.content.text||'').slice(0,200)+'</p>'+
-'<small style="color:#555">'+new Date(t.collectedAt).toLocaleString('ko-KR')+'</small>'+
-(t.affiliate&&t.affiliate.hasAffiliate?' <span class="b" style="background:#ff6b3520;color:#ff6b35">제휴링크</span>':'')+
-'</div>'}).join(''):'<div class="em">수집된 '+lb[c]+' 데이터가 없습니다.</div>')+'</div>'})
+
+function renderThreadCard(t){
+  const cat = CATS[t.category?.primary] || CATS.uncategorized;
+  const isDeleted = t.deletion?.isDeleted;
+  const sent = SENT[t.analysis?.sentiment] || SENT.neutral;
+  const eng = t.metrics?.engagementRate || 0;
+  const engColor = eng>90?'#10B981':eng>70?'#F59E0B':'#EF4444';
+
+  let mediaHtml = '';
+  if(t.content?.thumbnailUrl || (t.content?.mediaUrls && t.content.mediaUrls.length > 0)){
+    const imgUrl = t.content.thumbnailUrl || t.content.mediaUrls[0];
+    const isVideo = t.content.mediaType === 'video';
+    const isCarousel = t.content.mediaType === 'carousel';
+    const count = t.content.mediaUrls ? t.content.mediaUrls.length : 0;
+    mediaHtml = '<div class="card-media"><img src="'+imgUrl+'" alt="media" onerror="this.style.display=\'none\'">';
+    if(isVideo) mediaHtml += '<span class="video-badge">\u25b6 \ub3d9\uc601\uc0c1</span>';
+    if(isCarousel && count>1){
+      mediaHtml += '<div class="carousel-dots">';
+      for(let i=0;i<count;i++) mediaHtml += '<span class="dot'+(i===0?' active':'')+'"></span>';
+      mediaHtml += '</div>';
+    }
+    mediaHtml += '</div>';
+  }
+
+  let deletedHtml = '';
+  if(isDeleted){
+    deletedHtml = '<div class="deleted-overlay">\u26a0\ufe0f \uc0ad\uc81c\ub41c \ucf58\ud150\uce20 - \uc6d0\ubcf8 \uc791\uc131\uc790\uac00 '+timeAgo(t.deletion.deletedAt)+' \uc0ad\uc81c\ud568 (DB \ubcf4\uad00 \uc911)</div>';
+  }
+
+  let affHtml = '';
+  if(t.affiliate?.hasAffiliate && t.affiliate.links?.length){
+    const link = t.affiliate.links[0];
+    affHtml = '<div class="affiliate-url">\ud83d\udd17 <code>'+(link.shortUrl||link.url)+'</code></div>';
+  }
+
+  return '<div class="thread-card '+(t.category?.primary||'')+' '+(isDeleted?'deleted':'')+'">'
+    +'<div class="card-header"><div class="author-info">'
+    +'<div class="avatar">'+(t.author?.profilePicUrl ? '<img src="'+t.author.profilePicUrl+'" onerror="this.parentElement.textContent=\'\ud83d\udc64\'">' : '\ud83d\udc64')+'</div>'
+    +'<div><div class="author-name">@'+t.author?.username+'</div><div class="author-time">'+timeAgo(t.collectedAt)+'</div></div></div>'
+    +'<div class="badges">'
+    +'<span class="badge cat-'+(t.category?.primary||'')+'">'+cat.icon+' '+cat.label+'</span>'
+    +(t.category?.sub ? '<span class="badge sub">'+t.category.sub+'</span>':'')
+    +(t.author?.isVerified ? '<span class="badge verified">\u2713 \uc778\uc99d</span>':'')
+    +(t.affiliate?.hasAffiliate ? '<span class="badge affiliate">\ud83d\udcb0 \uc81c\ud718\ub9c1\ud06c</span>':'')
+    +(isDeleted ? '<span class="badge deleted-badge">\ud83d\uddd1 \uc0ad\uc81c\ub428</span>':'')
+    +'</div></div>'
+    + deletedHtml
+    +'<p class="card-content">'+t.content?.text+'</p>'
+    + mediaHtml + affHtml
+    +'<div class="card-metrics"><div class="metrics-left">'
+    +'<span>\u2764\ufe0f '+num(t.metrics?.likes)+'</span>'
+    +'<span>\ud83d\udcac '+num(t.metrics?.replies)+'</span>'
+    +'<span>\ud83d\udd04 '+num(t.metrics?.reposts)+'</span></div>'
+    +'<div class="metrics-right">'
+    +'<span class="sentiment '+(t.analysis?.sentiment||'neutral')+'"><span class="dot"></span>'+sent.label+'</span>'
+    +'<div class="eng-bar"><div class="track"><div class="fill" style="width:'+eng+'%;background:'+engColor+'"></div></div><span class="val">'+eng+'%</span></div>'
+    +'</div></div></div>';
 }
-function rP(e){
-q('/profiles?limit=100').then(function(r){
-var ps=r.data||[];
-e.innerHTML='<div class="sec"><h2>프로필 추가</h2>'+
-'<div class="fr"><input id="nu" placeholder="쓰레드 사용자명 (예: zuck)">'+
-'<select id="nc"><option value="shopping">쇼핑</option><option value="issue">이슈</option><option value="personal">퍼스널</option></select>'+
-'<select id="np"><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select>'+
-'<button class="btn" onclick="aP()">추가</button></div></div>'+
-'<div class="sec"><h2>추적 중 ('+ps.length+')</h2>'+
-(ps.length?ps.map(function(p){
-return'<div class="pi"><div><strong>@'+p.username+'</strong>'+
-' <span class="b '+(p.category&&p.category.primary||'')+'">'+(p.category&&p.category.primary||'미분류')+'</span>'+
-' <span class="tg">'+(p.tracking&&p.tracking.priority||'medium')+'</span>'+
-' <small style="color:#555">수집:'+(p.tracking&&p.tracking.totalCollected||0)+'건</small></div>'+
-'<button class="btn d" onclick="dP(\x27'+p._id+'\x27)">중지</button></div>'}).join(''):'<div class="em">추적 중인 프로필이 없습니다.</div>')+'</div>'})
+
+function renderFeed(){
+  const list = document.getElementById('threadList');
+  let threads = state.threads;
+  if(state.category !== 'all') threads = threads.filter(t => t.category?.primary === state.category);
+  if(state.search){
+    const q = state.search.toLowerCase();
+    threads = threads.filter(t => (t.content?.text||'').toLowerCase().includes(q) || (t.author?.username||'').toLowerCase().includes(q));
+  }
+  document.getElementById('threadCount').textContent = threads.length + '\uac1c \uc2a4\ub808\ub4dc \ud45c\uc2dc \uc911';
+  list.innerHTML = threads.length ? threads.map(renderThreadCard).join('') : '<div style="text-align:center;padding:60px;color:#9CA3AF;font-size:15px">\uc218\uc9d1\ub41c \uc2a4\ub808\ub4dc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4. \uc218\uc9d1\ud558\uae30 \ubc84\ud2bc\uc744 \ub20c\ub7ec\uc8fc\uc138\uc694!</div>';
 }
-function rL(e){
-q('/collector/status').then(function(r){
-var s=r.data||{};
-e.innerHTML='<div class="sec"><h2>수집기 상태</h2>'+
-'<div class="stats" style="grid-template-columns:repeat(3,1fr)">'+
-'<div class="sc"><div class="n">'+(s.totalCollected||0)+'</div><div class="l">총 수집</div></div>'+
-'<div class="sc"><div class="n">'+(s.errors||0)+'</div><div class="l">에러</div></div>'+
-'<div class="sc"><div class="n">'+(s.lastRun?new Date(s.lastRun).toLocaleString("ko-KR"):"-")+'</div><div class="l">마지막 수집</div></div></div>'+
-'<div style="margin-top:16px;text-align:center">'+
-'<button class="btn" onclick="rN()" style="padding:12px 40px;font-size:16px">수동 수집 실행</button></div></div>'+
-'<div class="sec"><h2>수집 설정</h2>'+
-'<p style="color:#888">자동 수집: <strong>5분</strong> 간격</p>'+
-'<p style="color:#888;margin-top:8px">배치당 최대: <strong>100</strong> 쓰레드</p></div>'})
+
+function renderCategoryChart(){
+  const el = document.getElementById('categoryChart');
+  const counts = {shopping:0,issue:0,personal:0};
+  state.threads.forEach(t => { if(counts[t.category?.primary] !== undefined) counts[t.category.primary]++; });
+  const total = state.threads.length || 1;
+  el.innerHTML = '<h3>\ud83d\udcca \uce74\ud14c\uace0\ub9ac \ubd84\ud3ec</h3>'
+    + Object.entries(counts).map(([k,c]) => {
+      const cat = CATS[k]; const pct = Math.round(c/total*100);
+      return '<div class="chart-row"><div class="chart-label"><span class="name">'+cat.icon+' '+cat.label+'</span><span class="count">'+c+'\uac1c ('+pct+'%)</span></div><div class="chart-track"><div class="chart-fill" style="width:'+pct+'%;background:'+cat.color+'"></div></div></div>';
+    }).join('');
 }
-function aP(){
-var u=document.getElementById('nu').value.trim().replace('@','');
-var c=document.getElementById('nc').value;
-var p=document.getElementById('np').value;
-if(!u){alert('사용자명을 입력하세요');return}
-q('/profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,category:c,priority:p})}).then(function(r){
-if(r.success){document.getElementById('nu').value='';R()}else{alert(r.error||'추가 실패')}})
+
+function renderAffiliatePanel(){
+  const el = document.getElementById('affiliatePanel');
+  const affThreads = state.threads.filter(t => t.affiliate?.hasAffiliate);
+  const platforms = {};
+  affThreads.forEach(t => { (t.affiliate.links||[]).forEach(l => { platforms[l.platform] = (platforms[l.platform]||0)+1; }); });
+  const sorted = Object.entries(platforms).sort((a,b) => b[1]-a[1]);
+  const topPlatform = sorted[0]?.[0] || '-';
+  el.innerHTML = '<h3>\ud83d\udcb0 \uc81c\ud718\ub9c1\ud06c \ud2b8\ub798\ucee4</h3>'
+    + sorted.map(([p,c]) => '<div class="aff-item"><span class="name">'+p+'</span><span class="num">'+c+'</span></div>').join('')
+    + '<div class="aff-summary">\u2705 \uc218\uc9d1\ub41c \uc81c\ud718\ub9c1\ud06c: <strong>'+affThreads.length+'\uac1c</strong><br>\ud83d\udcc8 \uac00\uc7a5 \ud65c\ubc1c\ud55c \ud50c\ub7ab\ud3fc: <strong>'+topPlatform+'</strong></div>';
 }
-function dP(id){
-if(!confirm('이 프로필 추적을 중지하시겠습니까?'))return;
-q('/profiles/'+id,{method:'DELETE'}).then(function(){R()})
+
+function renderTrending(){
+  const el = document.getElementById('trendingPanel');
+  const kwMap = {};
+  state.threads.forEach(t => { (t.analysis?.keywords||[]).forEach(k => { kwMap[k] = (kwMap[k]||0)+1; }); });
+  const sorted = Object.entries(kwMap).sort((a,b) => b[1]-a[1]).slice(0,15);
+  const maxCount = sorted[0]?.[1] || 1;
+  const colors = ['#FF6B35','#4361EE','#7B2CBF','#10B981','#EF4444','#F59E0B'];
+  el.innerHTML = '<h3>\ud83d\udd25 \ud2b8\ub80c\ub529 \ud0a4\uc6cc\ub4dc</h3><div class="kw-cloud">'
+    + sorted.map(([kw,c],i) => {
+      const size = 14 + Math.round((c/maxCount)*18);
+      return '<span style="font-size:'+size+'px;color:'+colors[i%colors.length]+'">'+kw+'</span>';
+    }).join('') + '</div>';
 }
-function rN(){
-q('/collector/run',{method:'POST'}).then(function(r){
-alert(r.success?'수집이 시작되었습니다!':'수집 실패');
-setTimeout(R,3000)})
+
+function renderAnalytics(){
+  const el = document.getElementById('analyticsTab');
+  const total = state.threads.length || 1;
+  // Sentiment
+  let sentHtml = '<div class="panel"><h3>\ud83d\ude0a \uac10\uc815 \ubd84\uc11d \uc694\uc57d</h3>';
+  ['positive','neutral','negative'].forEach(s => {
+    const c = state.threads.filter(t => t.analysis?.sentiment===s).length;
+    const pct = Math.round(c/total*100);
+    sentHtml += '<div class="chart-row"><div class="chart-label"><span class="name">'+SENT[s].label+'</span><span class="count">'+c+'\uac1c ('+pct+'%)</span></div><div class="chart-track"><div class="chart-fill" style="width:'+pct+'%;background:'+SENT[s].color+'"></div></div></div>';
+  });
+  sentHtml += '</div>';
+  // Sub categories
+  const SUB_CATS = {shopping:['AliExpress','\ucfe0\ud321\ud30c\ud2b8\ub108\uc2a4','Rakuten','Amazon'],issue:['\uc5f0\uc608','\uc2dc\uc0ac','\uacbd\uc81c','IT/\ud14c\ud06c','\uc2a4\ud3ec\uce20'],personal:['\ub9c8\ucf00\ud305','\ub514\uc790\uc778','\ud22c\uc790','\ub77c\uc774\ud504\uc2a4\ud0c0\uc77c']};
+  let subHtml = '<div class="panel full-width"><h3>\ud83d\udcc2 \uc11c\ube0c \uce74\ud14c\uace0\ub9ac\ubcc4 \uc218\uc9d1 \ud604\ud669</h3><div class="sub-cat-grid">';
+  Object.entries(SUB_CATS).forEach(([k,subs]) => {
+    const cat = CATS[k];
+    subHtml += '<div class="sub-cat-box" style="background:'+cat.bg+'"><div class="title" style="color:'+cat.color+'">'+cat.icon+' '+cat.label+'</div>';
+    subs.forEach(sub => {
+      const c = state.threads.filter(t => t.category?.sub===sub).length;
+      subHtml += '<div class="sub-item"><span>'+sub+'</span><span style="font-weight:600">'+c+'</span></div>';
+    });
+    subHtml += '</div>';
+  });
+  subHtml += '</div></div>';
+  el.innerHTML = '<div class="analytics-grid"><div class="panel" id="analyticsCatChart"></div>'+sentHtml+subHtml+'</div>';
+  // Reuse category chart in analytics
+  const aCat = document.getElementById('analyticsCatChart');
+  const counts = {shopping:0,issue:0,personal:0};
+  state.threads.forEach(t => { if(counts[t.category?.primary]!==undefined) counts[t.category.primary]++; });
+  aCat.innerHTML = '<h3>\ud83d\udcca \uce74\ud14c\uace0\ub9ac \ubd84\ud3ec</h3>'
+    + Object.entries(counts).map(([k,c]) => {
+      const cat = CATS[k]; const pct = Math.round(c/total*100);
+      return '<div class="chart-row"><div class="chart-label"><span class="name">'+cat.icon+' '+cat.label+'</span><span class="count">'+c+'\uac1c ('+pct+'%)</span></div><div class="chart-track"><div class="chart-fill" style="width:'+pct+'%;background:'+cat.color+'"></div></div></div>';
+    }).join('');
 }
-R();
+
+function switchTab(tab){
+  state.tab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('feedTab').style.display = tab==='feed' ? 'block' : 'none';
+  document.getElementById('analyticsTab').style.display = tab==='analytics' ? 'block' : 'none';
+  if(tab==='analytics') renderAnalytics();
+}
+
+function setCategory(cat){
+  state.category = cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat===cat));
+  renderFeed();
+}
+
+function applyFilters(){
+  state.search = document.getElementById('searchInput').value;
+  state.sort = document.getElementById('sortSelect').value;
+  // Sort
+  const sortMap = { latest: (a,b) => new Date(b.collectedAt)-new Date(a.collectedAt), popular: (a,b) => (b.metrics?.likes||0)-(a.metrics?.likes||0), engagement: (a,b) => (b.metrics?.engagementRate||0)-(a.metrics?.engagementRate||0), replies: (a,b) => (b.metrics?.replies||0)-(a.metrics?.replies||0) };
+  state.threads.sort(sortMap[state.sort] || sortMap.latest);
+  renderFeed();
+}
+
+async function runCollect(){
+  const btn = document.getElementById('collectBtn');
+  btn.disabled = true; btn.textContent = '\u23f3 \uc218\uc9d1 \uc911...';
+  document.getElementById('statusText').textContent = '\uc218\uc9d1 \uc911';
+  document.getElementById('statusDot').className = 'status-dot on';
+  document.getElementById('statusBadge').className = 'status-badge running';
+  try {
+    const r = await fetch('/api/collector/run', {method:'POST'});
+    const d = await r.json();
+    btn.textContent = '\u2705 \uc644\ub8cc!';
+    setTimeout(async () => {
+      btn.disabled = false; btn.textContent = '\ud83d\ude80 \uc218\uc9d1\ud558\uae30';
+      await loadData();
+    }, 2000);
+  } catch(e) {
+    btn.textContent = '\u274c \uc624\ub958'; btn.disabled = false;
+    setTimeout(() => { btn.textContent = '\ud83d\ude80 \uc218\uc9d1\ud558\uae30'; }, 2000);
+  }
+}
+
+async function loadData(){
+  try {
+    const [statsRes, threadsRes, trendRes] = await Promise.all([
+      fetch('/api/stats/overview').then(r=>r.json()),
+      fetch('/api/threads?includeDeleted=true&limit=100').then(r=>r.json()),
+      fetch('/api/stats/trending').then(r=>r.json())
+    ]);
+    if(statsRes.success) { state.stats = statsRes.stats; renderStats(state.stats); }
+    if(threadsRes.success) { state.threads = threadsRes.threads; renderFeed(); renderCategoryChart(); renderAffiliatePanel(); }
+    if(trendRes.success) {
+      // Merge trending data with thread keywords
+      renderTrending();
+    } else { renderTrending(); }
+    document.getElementById('lastInfo').textContent = '\u23f1\ufe0f \ub9c8\uc9c0\ub9c9: ' + new Date().toLocaleTimeString('ko-KR');
+    document.getElementById('statusText').textContent = state.threads.length + '\uac1c \uc218\uc9d1\ub428';
+  } catch(e) {
+    console.error('Load error:', e);
+    document.getElementById('statusText').textContent = '\uc624\ub958 \ubc1c\uc0dd';
+    document.getElementById('statusDot').className = 'status-dot off';
+    document.getElementById('statusBadge').className = 'status-badge stopped';
+  }
+}
+
+// Init
+loadData();
+// Auto refresh every 60s
+setInterval(loadData, 60000);
 </script>
 </body>
 </html>
