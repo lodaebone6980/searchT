@@ -1,0 +1,59 @@
+import mongoose from 'mongoose';
+
+const threadSchema = new mongoose.Schema({
+  threadId: { type: String, required: true, unique: true, index: true },
+  author: {
+    username: { type: String, required: true, index: true },
+    userId: String,
+    displayName: String,
+    bio: String,
+    followerCount: Number,
+    isVerified: { type: Boolean, default: false },
+  },
+  content: {
+    text: { type: String, default: '' },
+    mediaType: { type: String, enum: ['text', 'image', 'video', 'carousel', 'link'], default: 'text' },
+    mediaUrls: [String],
+    urls: [String],
+    hashtags: [String],
+    mentions: [String],
+  },
+  category: {
+    primary: { type: String, enum: ['shopping', 'issue', 'personal', 'uncategorized'], default: 'uncategorized', index: true },
+    sub: { type: String, default: '' },
+    confidence: { type: Number, default: 0 },
+    classifiedBy: { type: String, enum: ['rule', 'ai', 'manual'], default: 'rule' },
+  },
+  affiliate: {
+    hasAffiliate: { type: Boolean, default: false, index: true },
+    links: [{
+      url: String,
+      platform: { type: String, enum: ['aliexpress', 'coupang', 'rakuten', 'amazon', 'other'] },
+      shortUrl: String,
+      detectedIn: { type: String, enum: ['content', 'bio', 'comment'] },
+    }],
+  },
+  metrics: {
+    likes: { type: Number, default: 0 },
+    replies: { type: Number, default: 0 },
+    reposts: { type: Number, default: 0 },
+    quotes: { type: Number, default: 0 },
+    engagementRate: { type: Number, default: 0 },
+  },
+  analysis: {
+    sentiment: { type: String, enum: ['positive', 'neutral', 'negative'], default: 'neutral' },
+    keywords: [String],
+    viralScore: { type: Number, default: 0 },
+    language: { type: String, default: 'ko' },
+  },
+  publishedAt: { type: Date },
+  collectedAt: { type: Date, default: Date.now },
+  source: { type: String, enum: ['official_api', 'scraper', 'manual'], default: 'scraper' },
+}, { timestamps: true });
+
+threadSchema.index({ 'category.primary': 1, collectedAt: -1 });
+threadSchema.index({ 'affiliate.hasAffiliate': 1 });
+threadSchema.index({ 'analysis.sentiment': 1 });
+threadSchema.index({ 'content.text': 'text' });
+
+export default mongoose.model('Thread', threadSchema);
