@@ -19,3 +19,6 @@ Node.js, Express, MongoDB, Redis, BullMQ, OpenAI, Docker, Railway
 
 ## License
 MIT
+
+
+<!-- v1.1 -->
