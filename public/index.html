@@ -1,440 +1,533 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ThreadsCollector</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F8F9FB;min-height:100vh;color:#1a1a2e}
-.nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);padding:16px 32px;color:#fff}
-.nav-inner{display:flex;justify-content:space-between;align-items:center;max-width:1400px;margin:0 auto}
-.logo{display:flex;align-items:center;gap:12px}
-.logo h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
-.logo p{font-size:12px;opacity:0.7}
-.nav-right{display:flex;align-items:center;gap:12px}
-.collect-btn{padding:8px 20px;background:linear-gradient(135deg,#FF6B35,#FF8F5E);border:none;border-radius:20px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px}
-.collect-btn:hover{transform:scale(1.05);box-shadow:0 4px 15px rgba(255,107,53,0.4)}
-.collect-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
-.status-badge{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600}
-.status-badge.running{background:rgba(16,185,129,0.2)}
-.status-badge.stopped{background:rgba(239,68,68,0.2)}
-.status-dot{width:8px;height:8px;border-radius:50%}
-.status-dot.on{background:#10B981;animation:pulse 2s infinite}
-.status-dot.off{background:#EF4444}
-.last-info{padding:6px 14px;background:rgba(255,255,255,0.1);border-radius:10px;font-size:12px}
-.main{max-width:1400px;margin:0 auto;padding:24px 32px}
-.stats-row{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
-.stat-card{background:#fff;border-radius:16px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);flex:1;min-width:180px}
-.stat-card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.stat-card .icon{font-size:28px}
-.stat-card .trend{font-size:12px;padding:2px 8px;border-radius:12px;font-weight:600}
-.trend.up{color:#10B981;background:#ECFDF5}
-.trend.down{color:#EF4444;background:#FEF2F2}
-.stat-card .value{font-size:28px;font-weight:800;letter-spacing:-1px}
-.stat-card .label{font-size:13px;color:#6b7280;margin-top:4px}
-.tab-bar{display:flex;gap:4px;margin-bottom:24px;background:#fff;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);width:fit-content}
-.tab-btn{padding:10px 20px;border-radius:10px;border:none;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;background:transparent;color:#6B7280}
-.tab-btn.active{background:#1a1a2e;color:#fff}
-.filters{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
-.search-box{position:relative;flex:1 1 300px;max-width:400px}
-.search-box input{width:100%;padding:12px 12px 12px 40px;border-radius:12px;border:1px solid #E5E7EB;font-size:14px;outline:none;transition:border-color .2s}
-.search-box input:focus{border-color:#4361EE}
-.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px}
-.cat-btns{display:flex;gap:8px;flex-wrap:wrap}
-.cat-btn{padding:10px 18px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;background:#fff;border:1px solid #E5E7EB;color:#374151}
-.cat-btn.active{border-width:2px}
-.cat-btn[data-cat="shopping"].active{border-color:#FF6B35;background:#FFF3ED;color:#FF6B35}
-.cat-btn[data-cat="issue"].active{border-color:#4361EE;background:#EEF1FF;color:#4361EE}
-.cat-btn[data-cat="personal"].active{border-color:#7B2CBF;background:#F5EEFF;color:#7B2CBF}
-.cat-btn[data-cat="all"].active{border-color:#1a1a2e;background:#1a1a2e;color:#fff}
-.content-grid{display:grid;grid-template-columns:1fr 320px;gap:24px}
-.thread-list{display:flex;flex-direction:column;gap:16px}
-.list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.list-header span{font-size:14px;color:#6B7280}
-.list-header select{padding:8px 12px;border-radius:8px;border:1px solid #E5E7EB;font-size:13px;color:#374151;background:#fff}
-.sidebar{display:flex;flex-direction:column;gap:20px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
+.nav-left{display:flex;align-items:center;gap:12px}
+.nav-logo{font-size:24px}
+.nav-title{font-size:18px;font-weight:700}
+.nav-sub{font-size:11px;opacity:0.7}
+.nav-right{display:flex;align-items:center;gap:10px}
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;transition:all 0.2s}
+.btn-collect{background:#10b981;color:#fff}
+.btn-collect:hover{background:#059669}
+.btn-collect.loading{opacity:0.7;pointer-events:none}
+.btn-token{background:rgba(255,255,255,0.15);color:#fff;font-size:12px}
+.btn-token:hover{background:rgba(255,255,255,0.25)}
+.nav-badge{background:#10b981;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.nav-status{font-size:11px;opacity:0.7}
 
-.thread-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border-left:4px solid #ccc;transition:transform .15s,box-shadow .15s;cursor:pointer}
-.thread-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.1)}
-.thread-card.shopping{border-left-color:#FF6B35}
-.thread-card.issue{border-left-color:#4361EE}
-.thread-card.personal{border-left-color:#7B2CBF}
-.thread-card.deleted{opacity:0.6;border-left-color:#EF4444;background:#FEF2F2}
-.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.stat-icon{font-size:20px;margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:700}
+.stat-label{font-size:12px;color:#666;margin-top:4px}
+.stat-trend{font-size:12px;font-weight:600;float:right;margin-top:-40px}
+.stat-trend.up{color:#10b981}
+
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:600;background:#fff;color:#666;transition:all 0.2s}
+.tab.active{background:#1a1a2e;color:#fff}
+
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filter-group{display:flex;gap:4px;padding:4px;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.filter-btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#666;transition:all 0.2s}
+.filter-btn.active{background:#1a1a2e;color:#fff}
+.filter-btn.cat-shopping.active{background:#f59e0b;color:#fff}
+.filter-btn.cat-issue.active{background:#3b82f6;color:#fff}
+.filter-btn.cat-personal.active{background:#8b5cf6;color:#fff}
+.filter-btn.region-domestic.active{background:#10b981;color:#fff}
+.filter-btn.region-overseas.active{background:#ef4444;color:#fff}
+
+.search-bar{flex:1;min-width:200px;position:relative}
+.search-bar input{width:100%;padding:10px 16px 10px 36px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;background:#fff}
+.search-bar input:focus{outline:none;border-color:#1a1a2e;box-shadow:0 0 0 3px rgba(26,26,46,0.1)}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#999;font-size:14px}
+
+.sort-select{padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;background:#fff;cursor:pointer}
+
+.content-area{display:flex;gap:20px}
+.feed{flex:1;min-width:0}
+.feed-count{font-size:13px;color:#666;margin-bottom:12px}
+
+.thread-card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border-left:4px solid #e5e7eb;transition:all 0.2s}
+.thread-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);transform:translateY(-1px)}
+.thread-card.cat-shopping{border-left-color:#f59e0b}
+.thread-card.cat-issue{border-left-color:#3b82f6}
+.thread-card.cat-personal{border-left-color:#8b5cf6}
+.thread-card.deleted{opacity:0.6;background:#fff5f5}
+
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .author-info{display:flex;align-items:center;gap:10px}
-.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;background:#F3F4F6;overflow:hidden}
+.avatar{width:40px;height:40px;border-radius:50%;background:#e5e7eb;overflow:hidden;flex-shrink:0}
 .avatar img{width:100%;height:100%;object-fit:cover}
-.author-name{font-weight:700;font-size:14px}
-.author-time{font-size:11px;color:#9CA3AF}
-.badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
-.badge.cat-shopping{color:#FF6B35;background:#FFF3ED}
-.badge.cat-issue{color:#4361EE;background:#EEF1FF}
-.badge.cat-personal{color:#7B2CBF;background:#F5EEFF}
-.badge.sub{color:#374151;background:#F3F4F6}
-.badge.affiliate{color:#D97706;background:#FFFBEB}
-.badge.deleted-badge{color:#EF4444;background:#FEF2F2}
-.badge.verified{color:#3B82F6;background:#EFF6FF}
-.card-content{font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px}
-.card-media{margin-bottom:14px;border-radius:12px;overflow:hidden;position:relative;max-height:300px}
-.card-media img{width:100%;height:200px;object-fit:cover;border-radius:12px}
-.card-media .video-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600}
-.card-media .carousel-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
-.card-media .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.5)}
-.card-media .dot.active{background:#fff}
-.affiliate-url{background:#FFFBEB;border:1px dashed #F59E0B;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400E;margin-bottom:14px;display:flex;align-items:center;gap:6px}
-.affiliate-url code{font-family:monospace}
-.expertise-tag{background:#F5EEFF;border-radius:8px;padding:6px 12px;font-size:12px;color:#7B2CBF;margin-bottom:14px;display:inline-block}
-.card-metrics{display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #F3F4F6}
-.metrics-left{display:flex;gap:16px;font-size:13px;color:#6B7280}
-.metrics-right{display:flex;align-items:center;gap:12px}
-.sentiment{display:inline-flex;align-items:center;gap:4px;font-size:12px}
-.sentiment .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.sentiment.positive{color:#10B981} .sentiment.positive .dot{background:#10B981}
-.sentiment.neutral{color:#F59E0B} .sentiment.neutral .dot{background:#F59E0B}
-.sentiment.negative{color:#EF4444} .sentiment.negative .dot{background:#EF4444}
-.eng-bar{display:flex;align-items:center;gap:8px;width:80px}
-.eng-bar .track{flex:1;height:6px;background:#F3F4F6;border-radius:3px;overflow:hidden}
-.eng-bar .fill{height:100%;border-radius:3px;transition:width .5s}
-.eng-bar .val{font-size:12px;font-weight:700;color:#374151;min-width:30px;text-align:right}
-.panel{background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
-.panel h3{margin:0 0 16px;font-size:16px;font-weight:700}
-.chart-row{margin-bottom:14px}
-.chart-label{display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px}
-.chart-label .name{font-weight:600;color:#374151}
-.chart-label .count{color:#6B7280}
-.chart-track{height:10px;background:#F3F4F6;border-radius:5px;overflow:hidden}
-.chart-fill{height:100%;border-radius:5px;transition:width .6s}
-.aff-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#FFFBEB;border-radius:10px;font-size:13px;margin-bottom:8px}
-.aff-item .name{font-weight:600;color:#92400E}
-.aff-item .num{background:#F59E0B;color:#fff;padding:2px 10px;border-radius:12px;font-weight:700;font-size:12px}
-.aff-summary{margin-top:12px;padding:14px;background:#F0FDF4;border-radius:10px;font-size:12px;color:#166534;line-height:1.6}
-.kw-cloud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;min-height:100px}
-.kw-cloud span{font-weight:700;opacity:0.85;cursor:pointer;transition:opacity .2s}
-.kw-cloud span:hover{opacity:1}
-.analytics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
-.full-width{grid-column:span 2}
-.sub-cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.sub-cat-box{padding:16px;border-radius:12px}
-.sub-cat-box .title{font-weight:700;font-size:14px;margin-bottom:10px}
-.sub-item{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#374151;border-bottom:1px solid rgba(0,0,0,0.05)}
-.deleted-overlay{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 12px;font-size:12px;color:#991B1B;margin-bottom:14px;display:flex;align-items:center;gap:6px}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-@media(max-width:1024px){.content-grid{grid-template-columns:1fr}.analytics-grid{grid-template-columns:1fr}.full-width{grid-column:span 1}.sub-cat-grid{grid-template-columns:1fr}}
-@media(max-width:768px){.nav{padding:12px 16px}.main{padding:16px}.stats-row{flex-direction:column}.filters{flex-direction:column}.cat-btns{width:100%;overflow-x:auto}}
-</style>
-</head>
-<body>
+.author-name{font-weight:600;font-size:14px}
+.author-time{font-size:11px;color:#999}
+.card-badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600}
+.badge-cat{background:#f0f0f0;color:#666}
+.badge-shopping{background:#fef3c7;color:#92400e}
+.badge-issue{background:#dbeafe;color:#1e40af}
+.badge-personal{background:#ede9fe;color:#5b21b6}
+.badge-sub{background:#f0fdf4;color:#166534}
+.badge-verified{background:#dbeafe;color:#1d4ed8}
+.badge-affiliate{background:#fef2f2;color:#991b1b}
+.badge-deleted{background:#fee2e2;color:#991b1b}
+.badge-region{font-size:10px;padding:2px 6px;border-radius:4px}
+.badge-domestic{background:#d1fae5;color:#065f46}
+.badge-overseas{background:#fee2e2;color:#991b1b}
 
-<nav class="nav">
-  <div class="nav-inner">
-    <div class="logo">
-      <span style="font-size:32px">🧵</span>
-      <div><h1>ThreadsCollector</h1><p>Meta Threads 빅데이터 수집 & 분석 플랫폼</p></div>
+.card-text{font-size:14px;line-height:1.6;margin-bottom:10px;word-break:break-word}
+.deleted-notice{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-bottom:10px}
+
+.card-media{position:relative;border-radius:8px;overflow:hidden;margin-bottom:10px;max-height:300px}
+.card-media img{width:100%;height:auto;display:block;object-fit:cover;max-height:300px}
+.video-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;padding:3px 8px;border-radius:4px;font-size:11px}
+.carousel-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+.carousel-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.5)}
+.carousel-dot.active{background:#fff}
+
+.affiliate-url{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;font-size:12px;color:#92400e;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+.card-footer{display:flex;justify-content:space-between;align-items:center}
+.metrics{display:flex;gap:16px;font-size:12px;color:#666}
+.metric{display:flex;align-items:center;gap:4px}
+.sentiment-bar{display:flex;align-items:center;gap:6px;font-size:12px}
+.sentiment-dot{width:8px;height:8px;border-radius:50%}
+.sentiment-dot.positive{background:#10b981}
+.sentiment-dot.neutral{background:#f59e0b}
+.sentiment-dot.negative{background:#ef4444}
+.engagement-bar{width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.engagement-fill{height:100%;border-radius:3px}
+.engagement-fill.high{background:#10b981}
+.engagement-fill.mid{background:#f59e0b}
+.engagement-fill.low{background:#ef4444}
+
+.sidebar{width:320px;flex-shrink:0}
+.sidebar-card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.sidebar-title{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.cat-bar{display:flex;align-items:center;margin-bottom:8px;font-size:13px}
+.cat-bar-label{width:80px;flex-shrink:0}
+.cat-bar-track{flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;margin:0 8px}
+.cat-bar-fill{height:100%;border-radius:4px}
+.cat-bar-fill.shopping{background:#f59e0b}
+.cat-bar-fill.issue{background:#3b82f6}
+.cat-bar-fill.personal{background:#8b5cf6}
+.cat-bar-count{font-size:12px;color:#666;width:70px;text-align:right}
+
+.region-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.region-box{text-align:center;padding:12px;border-radius:8px}
+.region-box.domestic{background:#d1fae5}
+.region-box.overseas{background:#fee2e2}
+.region-box .region-count{font-size:24px;font-weight:700}
+.region-box .region-label{font-size:11px;color:#666;margin-top:4px}
+
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.analytics-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.analytics-card h3{font-size:15px;font-weight:700;margin-bottom:12px}
+.sentiment-row{display:flex;align-items:center;margin-bottom:8px;font-size:13px}
+.sentiment-row .label{width:50px}
+.sentiment-row .bar{flex:1;height:10px;background:#f0f0f0;border-radius:5px;overflow:hidden;margin:0 8px}
+.sentiment-row .fill{height:100%;border-radius:5px}
+.sentiment-row .fill.positive{background:#10b981}
+.sentiment-row .fill.neutral{background:#f59e0b}
+.sentiment-row .fill.negative{background:#ef4444}
+.subcat-list{display:flex;flex-direction:column;gap:6px}
+.subcat-item{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f5f5f5}
+
+.token-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;justify-content:center;align-items:center}
+.token-modal.show{display:flex}
+.token-dialog{background:#fff;border-radius:16px;padding:24px;width:480px;max-width:90vw}
+.token-dialog h3{font-size:18px;font-weight:700;margin-bottom:16px}
+.token-dialog p{font-size:13px;color:#666;margin-bottom:12px;line-height:1.5}
+.token-dialog input{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;margin-bottom:12px}
+.token-dialog .btn-row{display:flex;gap:8px;justify-content:flex-end}
+.token-dialog .btn-cancel{background:#f0f0f0;color:#666}
+.token-dialog .btn-save{background:#10b981;color:#fff}
+
+.empty-state{text-align:center;padding:60px 20px;color:#999}
+.empty-state .icon{font-size:48px;margin-bottom:12px}
+.empty-state p{font-size:14px}
+
+@media(max-width:768px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .content-area{flex-direction:column}
+  .sidebar{width:100%}
+  .analytics-grid{grid-template-columns:1fr}
+  .filters{flex-direction:column}
+}
+</style>
+</head><body>
+<nav>
+  <div class="nav-left">
+    <span class="nav-logo">🧵</span>
+    <div>
+      <div class="nav-title">ThreadsCollector</div>
+      <div class="nav-sub">Meta Threads 빅데이터 수집 및 분석 플랫폼</div>
     </div>
-    <div class="nav-right">
-      <button class="collect-btn" id="collectBtn" onclick="runCollect()">🚀 수집하기</button>
-      <div class="status-badge running" id="statusBadge">
-        <span class="status-dot on" id="statusDot"></span>
-        <span id="statusText">대기 중</span>
-      </div>
-      <div class="last-info" id="lastInfo">⏱️ 마지막 수집: -</div>
-    </div>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-token" onclick="showTokenModal()">🔑 API 토큰 설정</button>
+    <button class="btn btn-collect" id="collectBtn" onclick="runCollect()">✨ 수집하기</button>
+    <span class="nav-badge" id="totalBadge">0개 수집됨</span>
+    <span class="nav-status" id="lastUpdate"></span>
   </div>
 </nav>
 
-<div class="main">
-  <div class="stats-row" id="statsRow"></div>
+<div class="container">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon">📊</div>
+      <div class="stat-trend up" id="statTrend1">↑ +12.4%</div>
+      <div class="stat-value" id="statTotal">0</div>
+      <div class="stat-label">총 수집 스레드</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🌟</div>
+      <div class="stat-trend up" id="statTrend2">↑ +8.2%</div>
+      <div class="stat-value" id="statToday">0</div>
+      <div class="stat-label">오늘 수집</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🇰🇷</div>
+      <div class="stat-value" id="statDomestic">0</div>
+      <div class="stat-label">국내 스레드</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🌍</div>
+      <div class="stat-value" id="statOverseas">0</div>
+      <div class="stat-label">해외 스레드</div>
+    </div>
+  </div>
 
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="feed" onclick="switchTab('feed')">📋 피드</button>
-    <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">📊 분석</button>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('feed')">📋 피드</button>
+    <button class="tab" onclick="switchTab('analytics')">📊 분석</button>
   </div>
 
   <div id="feedTab">
     <div class="filters">
-      <div class="search-box">
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="setCategory('all',this)">전체</button>
+        <button class="filter-btn cat-shopping" onclick="setCategory('shopping',this)">🛒 쇼핑</button>
+        <button class="filter-btn cat-issue" onclick="setCategory('issue',this)">📰 이슈</button>
+        <button class="filter-btn cat-personal" onclick="setCategory('personal',this)">👤 퍼스널</button>
+      </div>
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="setRegion('all',this)">전체</button>
+        <button class="filter-btn region-domestic" onclick="setRegion('domestic',this)">🇰🇷 국내</button>
+        <button class="filter-btn region-overseas" onclick="setRegion('overseas',this)">🌍 해외</button>
+      </div>
+      <div class="search-bar">
         <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="키워드, 유저명으로 검색..." oninput="applyFilters()">
+        <input type="text" id="searchInput" placeholder="키워드, 유저명으로 검색..." oninput="debounceSearch()">
       </div>
-      <div class="cat-btns">
-        <button class="cat-btn active" data-cat="all" onclick="setCategory('all')">전체</button>
-        <button class="cat-btn" data-cat="shopping" onclick="setCategory('shopping')">🛒 쇼핑</button>
-        <button class="cat-btn" data-cat="issue" onclick="setCategory('issue')">📰 이슈</button>
-        <button class="cat-btn" data-cat="personal" onclick="setCategory('personal')">👤 퍼스널</button>
-      </div>
+      <select class="sort-select" id="sortSelect" onchange="loadThreads()">
+        <option value="latest">최신순</option>
+        <option value="popular">인기순</option>
+        <option value="engagement">참여율순</option>
+        <option value="replies">댓글수순</option>
+      </select>
     </div>
-    <div class="content-grid">
-      <div>
-        <div class="list-header">
-          <span id="threadCount">0개 스레드 표시 중</span>
-          <select id="sortSelect" onchange="applyFilters()">
-            <option value="latest">최신순</option>
-            <option value="popular">인기순</option>
-            <option value="engagement">참여율순</option>
-            <option value="replies">댓글수순</option>
-          </select>
-        </div>
-        <div class="thread-list" id="threadList"></div>
+
+    <div class="content-area">
+      <div class="feed">
+        <div class="feed-count" id="feedCount"></div>
+        <div id="threadList"></div>
       </div>
       <div class="sidebar">
-        <div class="panel" id="categoryChart"></div>
-        <div class="panel" id="affiliatePanel"></div>
-        <div class="panel" id="trendingPanel"></div>
+        <div class="sidebar-card">
+          <div class="sidebar-title">📊 카테고리 분포</div>
+          <div id="catChart"></div>
+        </div>
+        <div class="sidebar-card">
+          <div class="sidebar-title">🌏 국내/해외 분포</div>
+          <div class="region-summary" id="regionChart"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="analyticsTab" style="display:none"></div>
+  <div id="analyticsTab" style="display:none">
+    <div class="analytics-grid">
+      <div class="analytics-card">
+        <h3>😀 감정 분석 요약</h3>
+        <div id="sentimentChart"></div>
+      </div>
+      <div class="analytics-card">
+        <h3>📁 서브 카테고리별 수집 현황</h3>
+        <div id="subcatChart"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<script>
-const CATS = {
-  shopping:{label:'\uc1fc\ud551',icon:'\ud83d\uded2',color:'#FF6B35',bg:'#FFF3ED'},
-  issue:{label:'\uc774\uc288',icon:'\ud83d\udcf0',color:'#4361EE',bg:'#EEF1FF'},
-  personal:{label:'\ud37c\uc2a4\ub110',icon:'\ud83d\udc64',color:'#7B2CBF',bg:'#F5EEFF'},
-  uncategorized:{label:'\ubbf8\ubd84\ub958',icon:'\ud83d\udcc1',color:'#6B7280',bg:'#F3F4F6'}
-};
-const SENT = {positive:{label:'\uae0d\uc815',color:'#10B981'},neutral:{label:'\uc911\ub9bd',color:'#F59E0B'},negative:{label:'\ubd80\uc815',color:'#EF4444'}};
+<div class="token-modal" id="tokenModal">
+  <div class="token-dialog">
+    <h3>🔑 Meta Threads API 토큰 설정</h3>
+    <p>Threads Official API에서 실제 데이터를 수집하려면 액세스 토큰이 필요합니다.</p>
+    <p>토큰 발급 방법:<br>1. <a href="https://developers.facebook.com" target="_blank">Meta 개발자 포털</a>에서 앱 생성<br>2. Threads API 권한 추가<br>3. 액세스 토큰 발급</p>
+    <input type="text" id="tokenInput" placeholder="Threads API 액세스 토큰 입력...">
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="hideTokenModal()">취소</button>
+      <button class="btn btn-save" onclick="saveToken()">저장</button>
+    </div>
+  </div>
+</div><script>
+let currentCategory = 'all';
+let currentRegion = 'all';
+let searchTimer = null;
+let savedToken = localStorage.getItem('threads_token') || '';
 
-let state = { threads:[], stats:{}, category:'all', search:'', sort:'latest', tab:'feed' };
-
-function num(n){ return n ? n.toLocaleString() : '0'; }
-function timeAgo(d){
-  if(!d) return '-';
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff/60000);
-  if(m<1) return '\ubc29\uae08';
-  if(m<60) return m+'\ubd84 \uc804';
-  const h = Math.floor(m/60);
-  if(h<24) return h+'\uc2dc\uac04 \uc804';
-  return Math.floor(h/24)+'\uc77c \uc804';
+function timeAgo(date) {
+  const d = new Date(date);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 60000);
+  if (diff < 1) return '방금';
+  if (diff < 60) return diff + '분 전';
+  const h = Math.floor(diff / 60);
+  if (h < 24) return h + '시간 전';
+  const days = Math.floor(h / 24);
+  return days + '일 전';
 }
 
-function renderStats(s){
-  const row = document.getElementById('statsRow');
-  row.innerHTML = [
-    {icon:'\ud83d\udcca',label:'\ucd1d \uc218\uc9d1 \uc2a4\ub808\ub4dc',value:s.total||0,trend:'+12.4%',up:true},
-    {icon:'\ud83d\udce5',label:'\uc624\ub298 \uc218\uc9d1',value:s.today||0,trend:'+8.2%',up:true},
-    {icon:'\ud83d\udc65',label:'\ud65c\uc131 \ud504\ub85c\ud544',value:s.profiles||0,trend:'+3.1%',up:true},
-    {icon:'\ud83d\udd17',label:'\uc81c\ud718\ub9c1\ud06c \uc218\uc9d1',value:s.affiliateCount||0,trend:'+15.7%',up:true},
-  ].map(c => '<div class="stat-card"><div class="top"><span class="icon">'+c.icon+'</span>'+(c.trend?'<span class="trend '+(c.up?'up':'down')+'">'+(c.up?'\u2191':'\u2193')+' '+c.trend+'</span>':'')+'</div><div class="value">'+num(c.value)+'</div><div class="label">'+c.label+'</div></div>').join('');
+function formatNum(n) {
+  if (!n) return '0';
+  if (n >= 10000) return (n/10000).toFixed(1) + '만';
+  if (n >= 1000) return (n/1000).toFixed(1) + '천';
+  return n.toString();
 }
 
-function renderThreadCard(t){
-  const cat = CATS[t.category?.primary] || CATS.uncategorized;
-  const isDeleted = t.deletion?.isDeleted;
-  const sent = SENT[t.analysis?.sentiment] || SENT.neutral;
-  const eng = t.metrics?.engagementRate || 0;
-  const engColor = eng>90?'#10B981':eng>70?'#F59E0B':'#EF4444';
-
-  let mediaHtml = '';
-  if(t.content?.thumbnailUrl || (t.content?.mediaUrls && t.content.mediaUrls.length > 0)){
-    const imgUrl = t.content.thumbnailUrl || t.content.mediaUrls[0];
-    const isVideo = t.content.mediaType === 'video';
-    const isCarousel = t.content.mediaType === 'carousel';
-    const count = t.content.mediaUrls ? t.content.mediaUrls.length : 0;
-    mediaHtml = '<div class="card-media"><img src="'+imgUrl+'" alt="media" onerror="this.style.display=\'none\'">';
-    if(isVideo) mediaHtml += '<span class="video-badge">\u25b6 \ub3d9\uc601\uc0c1</span>';
-    if(isCarousel && count>1){
-      mediaHtml += '<div class="carousel-dots">';
-      for(let i=0;i<count;i++) mediaHtml += '<span class="dot'+(i===0?' active':'')+'"></span>';
-      mediaHtml += '</div>';
-    }
-    mediaHtml += '</div>';
-  }
-
-  let deletedHtml = '';
-  if(isDeleted){
-    deletedHtml = '<div class="deleted-overlay">\u26a0\ufe0f \uc0ad\uc81c\ub41c \ucf58\ud150\uce20 - \uc6d0\ubcf8 \uc791\uc131\uc790\uac00 '+timeAgo(t.deletion.deletedAt)+' \uc0ad\uc81c\ud568 (DB \ubcf4\uad00 \uc911)</div>';
-  }
-
-  let affHtml = '';
-  if(t.affiliate?.hasAffiliate && t.affiliate.links?.length){
-    const link = t.affiliate.links[0];
-    affHtml = '<div class="affiliate-url">\ud83d\udd17 <code>'+(link.shortUrl||link.url)+'</code></div>';
-  }
-
-  return '<div class="thread-card '+(t.category?.primary||'')+' '+(isDeleted?'deleted':'')+'">'
-    +'<div class="card-header"><div class="author-info">'
-    +'<div class="avatar">'+(t.author?.profilePicUrl ? '<img src="'+t.author.profilePicUrl+'" onerror="this.parentElement.textContent=\'\ud83d\udc64\'">' : '\ud83d\udc64')+'</div>'
-    +'<div><div class="author-name">@'+t.author?.username+'</div><div class="author-time">'+timeAgo(t.collectedAt)+'</div></div></div>'
-    +'<div class="badges">'
-    +'<span class="badge cat-'+(t.category?.primary||'')+'">'+cat.icon+' '+cat.label+'</span>'
-    +(t.category?.sub ? '<span class="badge sub">'+t.category.sub+'</span>':'')
-    +(t.author?.isVerified ? '<span class="badge verified">\u2713 \uc778\uc99d</span>':'')
-    +(t.affiliate?.hasAffiliate ? '<span class="badge affiliate">\ud83d\udcb0 \uc81c\ud718\ub9c1\ud06c</span>':'')
-    +(isDeleted ? '<span class="badge deleted-badge">\ud83d\uddd1 \uc0ad\uc81c\ub428</span>':'')
-    +'</div></div>'
-    + deletedHtml
-    +'<p class="card-content">'+t.content?.text+'</p>'
-    + mediaHtml + affHtml
-    +'<div class="card-metrics"><div class="metrics-left">'
-    +'<span>\u2764\ufe0f '+num(t.metrics?.likes)+'</span>'
-    +'<span>\ud83d\udcac '+num(t.metrics?.replies)+'</span>'
-    +'<span>\ud83d\udd04 '+num(t.metrics?.reposts)+'</span></div>'
-    +'<div class="metrics-right">'
-    +'<span class="sentiment '+(t.analysis?.sentiment||'neutral')+'"><span class="dot"></span>'+sent.label+'</span>'
-    +'<div class="eng-bar"><div class="track"><div class="fill" style="width:'+eng+'%;background:'+engColor+'"></div></div><span class="val">'+eng+'%</span></div>'
-    +'</div></div></div>';
-}
-
-function renderFeed(){
-  const list = document.getElementById('threadList');
-  let threads = state.threads;
-  if(state.category !== 'all') threads = threads.filter(t => t.category?.primary === state.category);
-  if(state.search){
-    const q = state.search.toLowerCase();
-    threads = threads.filter(t => (t.content?.text||'').toLowerCase().includes(q) || (t.author?.username||'').toLowerCase().includes(q));
-  }
-  document.getElementById('threadCount').textContent = threads.length + '\uac1c \uc2a4\ub808\ub4dc \ud45c\uc2dc \uc911';
-  list.innerHTML = threads.length ? threads.map(renderThreadCard).join('') : '<div style="text-align:center;padding:60px;color:#9CA3AF;font-size:15px">\uc218\uc9d1\ub41c \uc2a4\ub808\ub4dc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4. \uc218\uc9d1\ud558\uae30 \ubc84\ud2bc\uc744 \ub20c\ub7ec\uc8fc\uc138\uc694!</div>';
-}
-
-function renderCategoryChart(){
-  const el = document.getElementById('categoryChart');
-  const counts = {shopping:0,issue:0,personal:0};
-  state.threads.forEach(t => { if(counts[t.category?.primary] !== undefined) counts[t.category.primary]++; });
-  const total = state.threads.length || 1;
-  el.innerHTML = '<h3>\ud83d\udcca \uce74\ud14c\uace0\ub9ac \ubd84\ud3ec</h3>'
-    + Object.entries(counts).map(([k,c]) => {
-      const cat = CATS[k]; const pct = Math.round(c/total*100);
-      return '<div class="chart-row"><div class="chart-label"><span class="name">'+cat.icon+' '+cat.label+'</span><span class="count">'+c+'\uac1c ('+pct+'%)</span></div><div class="chart-track"><div class="chart-fill" style="width:'+pct+'%;background:'+cat.color+'"></div></div></div>';
-    }).join('');
-}
-
-function renderAffiliatePanel(){
-  const el = document.getElementById('affiliatePanel');
-  const affThreads = state.threads.filter(t => t.affiliate?.hasAffiliate);
-  const platforms = {};
-  affThreads.forEach(t => { (t.affiliate.links||[]).forEach(l => { platforms[l.platform] = (platforms[l.platform]||0)+1; }); });
-  const sorted = Object.entries(platforms).sort((a,b) => b[1]-a[1]);
-  const topPlatform = sorted[0]?.[0] || '-';
-  el.innerHTML = '<h3>\ud83d\udcb0 \uc81c\ud718\ub9c1\ud06c \ud2b8\ub798\ucee4</h3>'
-    + sorted.map(([p,c]) => '<div class="aff-item"><span class="name">'+p+'</span><span class="num">'+c+'</span></div>').join('')
-    + '<div class="aff-summary">\u2705 \uc218\uc9d1\ub41c \uc81c\ud718\ub9c1\ud06c: <strong>'+affThreads.length+'\uac1c</strong><br>\ud83d\udcc8 \uac00\uc7a5 \ud65c\ubc1c\ud55c \ud50c\ub7ab\ud3fc: <strong>'+topPlatform+'</strong></div>';
-}
-
-function renderTrending(){
-  const el = document.getElementById('trendingPanel');
-  const kwMap = {};
-  state.threads.forEach(t => { (t.analysis?.keywords||[]).forEach(k => { kwMap[k] = (kwMap[k]||0)+1; }); });
-  const sorted = Object.entries(kwMap).sort((a,b) => b[1]-a[1]).slice(0,15);
-  const maxCount = sorted[0]?.[1] || 1;
-  const colors = ['#FF6B35','#4361EE','#7B2CBF','#10B981','#EF4444','#F59E0B'];
-  el.innerHTML = '<h3>\ud83d\udd25 \ud2b8\ub80c\ub529 \ud0a4\uc6cc\ub4dc</h3><div class="kw-cloud">'
-    + sorted.map(([kw,c],i) => {
-      const size = 14 + Math.round((c/maxCount)*18);
-      return '<span style="font-size:'+size+'px;color:'+colors[i%colors.length]+'">'+kw+'</span>';
-    }).join('') + '</div>';
-}
-
-function renderAnalytics(){
-  const el = document.getElementById('analyticsTab');
-  const total = state.threads.length || 1;
-  // Sentiment
-  let sentHtml = '<div class="panel"><h3>\ud83d\ude0a \uac10\uc815 \ubd84\uc11d \uc694\uc57d</h3>';
-  ['positive','neutral','negative'].forEach(s => {
-    const c = state.threads.filter(t => t.analysis?.sentiment===s).length;
-    const pct = Math.round(c/total*100);
-    sentHtml += '<div class="chart-row"><div class="chart-label"><span class="name">'+SENT[s].label+'</span><span class="count">'+c+'\uac1c ('+pct+'%)</span></div><div class="chart-track"><div class="chart-fill" style="width:'+pct+'%;background:'+SENT[s].color+'"></div></div></div>';
+function switchTab(tab) {
+  document.getElementById('feedTab').style.display = tab === 'feed' ? '' : 'none';
+  document.getElementById('analyticsTab').style.display = tab === 'analytics' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', (tab === 'feed' && i === 0) || (tab === 'analytics' && i === 1));
   });
-  sentHtml += '</div>';
-  // Sub categories
-  const SUB_CATS = {shopping:['AliExpress','\ucfe0\ud321\ud30c\ud2b8\ub108\uc2a4','Rakuten','Amazon'],issue:['\uc5f0\uc608','\uc2dc\uc0ac','\uacbd\uc81c','IT/\ud14c\ud06c','\uc2a4\ud3ec\uce20'],personal:['\ub9c8\ucf00\ud305','\ub514\uc790\uc778','\ud22c\uc790','\ub77c\uc774\ud504\uc2a4\ud0c0\uc77c']};
-  let subHtml = '<div class="panel full-width"><h3>\ud83d\udcc2 \uc11c\ube0c \uce74\ud14c\uace0\ub9ac\ubcc4 \uc218\uc9d1 \ud604\ud669</h3><div class="sub-cat-grid">';
-  Object.entries(SUB_CATS).forEach(([k,subs]) => {
-    const cat = CATS[k];
-    subHtml += '<div class="sub-cat-box" style="background:'+cat.bg+'"><div class="title" style="color:'+cat.color+'">'+cat.icon+' '+cat.label+'</div>';
-    subs.forEach(sub => {
-      const c = state.threads.filter(t => t.category?.sub===sub).length;
-      subHtml += '<div class="sub-item"><span>'+sub+'</span><span style="font-weight:600">'+c+'</span></div>';
-    });
-    subHtml += '</div>';
-  });
-  subHtml += '</div></div>';
-  el.innerHTML = '<div class="analytics-grid"><div class="panel" id="analyticsCatChart"></div>'+sentHtml+subHtml+'</div>';
-  // Reuse category chart in analytics
-  const aCat = document.getElementById('analyticsCatChart');
-  const counts = {shopping:0,issue:0,personal:0};
-  state.threads.forEach(t => { if(counts[t.category?.primary]!==undefined) counts[t.category.primary]++; });
-  aCat.innerHTML = '<h3>\ud83d\udcca \uce74\ud14c\uace0\ub9ac \ubd84\ud3ec</h3>'
-    + Object.entries(counts).map(([k,c]) => {
-      const cat = CATS[k]; const pct = Math.round(c/total*100);
-      return '<div class="chart-row"><div class="chart-label"><span class="name">'+cat.icon+' '+cat.label+'</span><span class="count">'+c+'\uac1c ('+pct+'%)</span></div><div class="chart-track"><div class="chart-fill" style="width:'+pct+'%;background:'+cat.color+'"></div></div></div>';
-    }).join('');
 }
 
-function switchTab(tab){
-  state.tab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
-  document.getElementById('feedTab').style.display = tab==='feed' ? 'block' : 'none';
-  document.getElementById('analyticsTab').style.display = tab==='analytics' ? 'block' : 'none';
-  if(tab==='analytics') renderAnalytics();
+function setCategory(cat, el) {
+  currentCategory = cat;
+  el.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadThreads();
 }
 
-function setCategory(cat){
-  state.category = cat;
-  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat===cat));
-  renderFeed();
+function setRegion(region, el) {
+  currentRegion = region;
+  el.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadThreads();
 }
 
-function applyFilters(){
-  state.search = document.getElementById('searchInput').value;
-  state.sort = document.getElementById('sortSelect').value;
-  // Sort
-  const sortMap = { latest: (a,b) => new Date(b.collectedAt)-new Date(a.collectedAt), popular: (a,b) => (b.metrics?.likes||0)-(a.metrics?.likes||0), engagement: (a,b) => (b.metrics?.engagementRate||0)-(a.metrics?.engagementRate||0), replies: (a,b) => (b.metrics?.replies||0)-(a.metrics?.replies||0) };
-  state.threads.sort(sortMap[state.sort] || sortMap.latest);
-  renderFeed();
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadThreads(), 300);
 }
 
-async function runCollect(){
+function showTokenModal() {
+  document.getElementById('tokenModal').classList.add('show');
+  document.getElementById('tokenInput').value = savedToken;
+}
+function hideTokenModal() { document.getElementById('tokenModal').classList.remove('show'); }
+function saveToken() {
+  savedToken = document.getElementById('tokenInput').value.trim();
+  localStorage.setItem('threads_token', savedToken);
+  hideTokenModal();
+  if (savedToken) alert('API 토큰이 저장되었습니다. 수집하기 버튼을 눌러 실제 데이터를 수집하세요!');
+}
+
+async function runCollect() {
   const btn = document.getElementById('collectBtn');
-  btn.disabled = true; btn.textContent = '\u23f3 \uc218\uc9d1 \uc911...';
-  document.getElementById('statusText').textContent = '\uc218\uc9d1 \uc911';
-  document.getElementById('statusDot').className = 'status-dot on';
-  document.getElementById('statusBadge').className = 'status-badge running';
+  if (!savedToken) { showTokenModal(); return; }
+  btn.classList.add('loading');
+  btn.innerHTML = '⏳ 수집 중...';
   try {
-    const r = await fetch('/api/collector/run', {method:'POST'});
-    const d = await r.json();
-    btn.textContent = '\u2705 \uc644\ub8cc!';
-    setTimeout(async () => {
-      btn.disabled = false; btn.textContent = '\ud83d\ude80 \uc218\uc9d1\ud558\uae30';
-      await loadData();
-    }, 2000);
-  } catch(e) {
-    btn.textContent = '\u274c \uc624\ub958'; btn.disabled = false;
-    setTimeout(() => { btn.textContent = '\ud83d\ude80 \uc218\uc9d1\ud558\uae30'; }, 2000);
+    const res = await fetch('/api/collector/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: savedToken })
+    });
+    const data = await res.json();
+    if (data.success) {
+      btn.innerHTML = '✅ ' + data.message;
+      setTimeout(() => { btn.innerHTML = '✨ 수집하기'; btn.classList.remove('loading'); }, 3000);
+      loadAll();
+    } else {
+      alert('수집 실패: ' + data.message);
+      btn.innerHTML = '✨ 수집하기';
+      btn.classList.remove('loading');
+    }
+  } catch (e) {
+    alert('오류: ' + e.message);
+    btn.innerHTML = '✨ 수집하기';
+    btn.classList.remove('loading');
   }
 }
 
-async function loadData(){
+async function loadStats() {
   try {
-    const [statsRes, threadsRes, trendRes] = await Promise.all([
-      fetch('/api/stats/overview').then(r=>r.json()),
-      fetch('/api/threads?includeDeleted=true&limit=100').then(r=>r.json()),
-      fetch('/api/stats/trending').then(r=>r.json())
-    ]);
-    if(statsRes.success) { state.stats = statsRes.stats; renderStats(state.stats); }
-    if(threadsRes.success) { state.threads = threadsRes.threads; renderFeed(); renderCategoryChart(); renderAffiliatePanel(); }
-    if(trendRes.success) {
-      // Merge trending data with thread keywords
-      renderTrending();
-    } else { renderTrending(); }
-    document.getElementById('lastInfo').textContent = '\u23f1\ufe0f \ub9c8\uc9c0\ub9c9: ' + new Date().toLocaleTimeString('ko-KR');
-    document.getElementById('statusText').textContent = state.threads.length + '\uac1c \uc218\uc9d1\ub428';
-  } catch(e) {
-    console.error('Load error:', e);
-    document.getElementById('statusText').textContent = '\uc624\ub958 \ubc1c\uc0dd';
-    document.getElementById('statusDot').className = 'status-dot off';
-    document.getElementById('statusBadge').className = 'status-badge stopped';
-  }
+    const res = await fetch('/api/stats');
+    const s = await res.json();
+    document.getElementById('statTotal').textContent = s.total;
+    document.getElementById('statToday').textContent = s.today;
+    document.getElementById('statDomestic').textContent = s.domestic || 0;
+    document.getElementById('statOverseas').textContent = s.overseas || 0;
+    document.getElementById('totalBadge').textContent = s.total + '개 수집됨';
+    document.getElementById('lastUpdate').textContent = '마지막: ' + new Date().toLocaleTimeString('ko-KR');
+
+    // Category chart
+    const cats = s.byCat || {};
+    const total = s.total || 1;
+    let catHtml = '';
+    const catNames = { shopping: '쇼핑', issue: '이슈', personal: '퍼스널' };
+    const catColors = { shopping: '#f59e0b', issue: '#3b82f6', personal: '#8b5cf6' };
+    ['shopping','issue','personal'].forEach(c => {
+      const count = cats[c] || 0;
+      const pct = Math.round(count / total * 100);
+      catHtml += '<div class="cat-bar"><span class="cat-bar-label">' + catNames[c] + '</span><div class="cat-bar-track"><div class="cat-bar-fill ' + c + '" style="width:' + pct + '%"></div></div><span class="cat-bar-count">' + count + '개 (' + pct + '%)</span></div>';
+    });
+    document.getElementById('catChart').innerHTML = catHtml;
+
+    // Region chart
+    document.getElementById('regionChart').innerHTML =
+      '<div class="region-box domestic"><div class="region-count">' + (s.domestic||0) + '</div><div class="region-label">🇰🇷 국내</div></div>' +
+      '<div class="region-box overseas"><div class="region-count">' + (s.overseas||0) + '</div><div class="region-label">🌍 해외</div></div>';
+
+    // Sentiment chart
+    const sent = s.bySentiment || {};
+    const sentTotal = Object.values(sent).reduce((a,b)=>a+b, 0) || 1;
+    let sentHtml = '';
+    const sentNames = { positive: '긍정', neutral: '중립', negative: '부정' };
+    ['positive','neutral','negative'].forEach(s2 => {
+      const count = sent[s2] || 0;
+      const pct = Math.round(count / sentTotal * 100);
+      sentHtml += '<div class="sentiment-row"><span class="label">' + sentNames[s2] + '</span><div class="bar"><div class="fill ' + s2 + '" style="width:' + pct + '%"></div></div><span>' + count + '개 (' + pct + '%)</span></div>';
+    });
+    document.getElementById('sentimentChart').innerHTML = sentHtml;
+  } catch (e) { console.error('Stats error:', e); }
 }
 
-// Init
-loadData();
-// Auto refresh every 60s
-setInterval(loadData, 60000);
+function renderThread(t) {
+  const isDeleted = t.deletion && t.deletion.isDeleted;
+  const catClass = 'cat-' + (t.category?.primary || 'uncategorized');
+  const regionLabel = t.region === 'overseas' ? '해외' : '국내';
+  const regionClass = t.region === 'overseas' ? 'badge-overseas' : 'badge-domestic';
+  const regionFlag = t.region === 'overseas' ? '🌍' : '🇰🇷';
+
+  const catNames = { shopping: '쇼핑', issue: '이슈', personal: '퍼스널', uncategorized: '미분류' };
+  const catBadgeClass = { shopping: 'badge-shopping', issue: 'badge-issue', personal: 'badge-personal' };
+
+  let html = '<div class="thread-card ' + catClass + (isDeleted ? ' deleted' : '') + '">';
+  html += '<div class="card-header"><div class="author-info">';
+  html += '<div class="avatar">' + (t.author?.profilePicUrl ? '<img src="' + t.author.profilePicUrl + '" alt="">' : '') + '</div>';
+  html += '<div><div class="author-name">@' + (t.author?.username || 'unknown') + '</div>';
+  html += '<div class="author-time">' + timeAgo(t.publishedAt || t.collectedAt) + '</div></div></div>';
+  html += '<div class="card-badges">';
+  html += '<span class="badge badge-region ' + regionClass + '">' + regionFlag + ' ' + regionLabel + '</span>';
+  html += '<span class="badge ' + (catBadgeClass[t.category?.primary] || 'badge-cat') + '">' + (catNames[t.category?.primary] || '미분류') + '</span>';
+  if (t.category?.sub) html += '<span class="badge badge-sub">' + t.category.sub + '</span>';
+  if (t.author?.isVerified) html += '<span class="badge badge-verified">✓ 인증</span>';
+  if (t.affiliate?.hasAffiliate) html += '<span class="badge badge-affiliate">💰 제휴링크</span>';
+  if (isDeleted) html += '<span class="badge badge-deleted">🗑 삭제됨</span>';
+  html += '</div></div>';
+
+  if (isDeleted) {
+    html += '<div class="deleted-notice">⚠️ 삭제된 콘텐츠 - 원본 작성자가 ' + timeAgo(t.deletion.deletedAt) + ' 삭제함 (DB 보관 중)</div>';
+  }
+
+  html += '<div class="card-text">' + (t.content?.text || '') + '</div>';
+
+  if (t.content?.thumbnailUrl) {
+    html += '<div class="card-media"><img src="' + t.content.thumbnailUrl + '" alt="" loading="lazy">';
+    if (t.content.mediaType === 'video') html += '<span class="video-badge">▶ 동영상</span>';
+    if (t.content.mediaType === 'carousel' && t.content.mediaUrls?.length > 1) {
+      html += '<div class="carousel-dots">';
+      t.content.mediaUrls.forEach((_, i) => { html += '<span class="carousel-dot' + (i===0?' active':'') + '"></span>'; });
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  if (t.affiliate?.hasAffiliate && t.affiliate.links?.length) {
+    t.affiliate.links.forEach(l => {
+      html += '<div class="affiliate-url">🔗 ' + (l.shortUrl || l.url || '') + '</div>';
+    });
+  }
+
+  const eng = t.metrics?.engagementRate || 0;
+  const engClass = eng >= 80 ? 'high' : eng >= 50 ? 'mid' : 'low';
+  html += '<div class="card-footer"><div class="metrics">';
+  html += '<span class="metric">❤️ ' + formatNum(t.metrics?.likes) + '</span>';
+  html += '<span class="metric">💬 ' + formatNum(t.metrics?.replies) + '</span>';
+  html += '<span class="metric">🔁 ' + formatNum(t.metrics?.reposts) + '</span>';
+  html += '</div><div class="sentiment-bar">';
+  html += '<span class="sentiment-dot ' + (t.analysis?.sentiment || 'neutral') + '"></span>';
+  html += '<div class="engagement-bar"><div class="engagement-fill ' + engClass + '" style="width:' + eng + '%"></div></div>';
+  html += '<span style="font-size:11px;color:#999">' + eng + '%</span>';
+  html += '</div></div></div>';
+  return html;
+}
+
+async function loadThreads() {
+  try {
+    const search = document.getElementById('searchInput').value;
+    const sort = document.getElementById('sortSelect').value;
+    let url = '/api/threads?sort=' + sort + '&includeDeleted=true';
+    if (currentCategory !== 'all') url += '&category=' + currentCategory;
+    if (currentRegion !== 'all') url += '&region=' + currentRegion;
+    if (search) url += '&search=' + encodeURIComponent(search);
+
+    const res = await fetch(url);
+    const data = await res.json();
+    const list = document.getElementById('threadList');
+    document.getElementById('feedCount').textContent = data.total + '개 스레드 표시 중';
+
+    if (!data.threads?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>수집된 스레드가 없습니다.<br>수집하기 버튼을 눌러 데이터를 수집해보세요.</p></div>';
+      return;
+    }
+    list.innerHTML = data.threads.map(renderThread).join('');
+  } catch (e) { console.error('Threads error:', e); }
+}
+
+async function loadSubcats() {
+  try {
+    const res = await fetch('/api/threads?limit=200&includeDeleted=true');
+    const data = await res.json();
+    const threads = data.threads || [];
+    const cats = { shopping: {}, issue: {}, personal: {} };
+    threads.forEach(t => {
+      const p = t.category?.primary;
+      const s = t.category?.sub || '미분류';
+      if (cats[p]) { cats[p][s] = (cats[p][s] || 0) + 1; }
+    });
+    const catNames = { shopping: '쇼핑', issue: '이슈', personal: '퍼스널' };
+    const catColors = { shopping: '#fef3c7', issue: '#dbeafe', personal: '#ede9fe' };
+    let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+    ['shopping','issue','personal'].forEach(cat => {
+      html += '<div style="background:' + catColors[cat] + ';border-radius:8px;padding:12px"><h4 style="font-size:13px;margin-bottom:8px">' + catNames[cat] + '</h4><div class="subcat-list">';
+      const items = cats[cat];
+      Object.entries(items).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => {
+        html += '<div class="subcat-item"><span>' + k + '</span><span>' + v + '</span></div>';
+      });
+      if (!Object.keys(items).length) html += '<div style="font-size:12px;color:#999">데이터 없음</div>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+    document.getElementById('subcatChart').innerHTML = html;
+  } catch (e) { console.error('Subcat error:', e); }
+}
+
+function loadAll() { loadStats(); loadThreads(); loadSubcats(); }
+loadAll();
+setInterval(loadAll, 60000);
 </script>
 </body>
 </html>
