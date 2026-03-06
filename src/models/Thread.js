@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const threadSchema = new mongoose.Schema({
   threadId: { type: String, required: true, unique: true, index: true },
   originalUrl: { type: String, default: '' },
+  platform: { type: String, enum: ['threads', 'instagram', 'twitter'], default: 'threads' },
   author: {
     username: { type: String, required: true, index: true },
     userId: String,
@@ -27,6 +28,12 @@ const threadSchema = new mongoose.Schema({
     sub: { type: String, default: '' },
     confidence: { type: Number, default: 0 },
     classifiedBy: { type: String, enum: ['rule', 'ai', 'manual'], default: 'rule' },
+  },
+  region: {
+    type: String,
+    enum: ['domestic', 'overseas'],
+    default: 'domestic',
+    index: true,
   },
   affiliate: {
     hasAffiliate: { type: Boolean, default: false, index: true },
@@ -58,13 +65,12 @@ const threadSchema = new mongoose.Schema({
   },
   publishedAt: { type: Date },
   collectedAt: { type: Date, default: Date.now },
-  source: { type: String, enum: ['official_api', 'scraper', 'manual'], default: 'scraper' },
+  source: { type: String, enum: ['official_api', 'scraper', 'manual'], default: 'official_api' },
 }, { timestamps: true });
 
-threadSchema.index({ 'category.primary': 1, collectedAt: -1 });
-threadSchema.index({ 'affiliate.hasAffiliate': 1 });
-threadSchema.index({ 'analysis.sentiment': 1 });
-threadSchema.index({ 'content.text': 'text' });
+threadSchema.index({ 'category.primary': 1, region: 1, collectedAt: -1 });
+threadSchema.index({ 'author.username': 1, collectedAt: -1 });
+threadSchema.index({ 'analysis.keywords': 1 });
 threadSchema.index({ 'deletion.isDeleted': 1 });
 
 export default mongoose.model('Thread', threadSchema);
