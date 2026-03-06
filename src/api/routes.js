@@ -1,260 +1,327 @@
-import express from 'express';
+import { Router } from 'express';
 import Thread from '../models/Thread.js';
-import Profile from '../models/Profile.js';
-import logger from '../utils/logger.js';
 
-const router = express.Router();
+const router = Router();
 
-// ── Stats Overview ──
-router.get('/stats/overview', async (req, res) => {
+// ===== Stats =====
+router.get('/stats', async (req, res) => {
   try {
-    const total = await Thread.countDocuments();
-    const today = await Thread.countDocuments({ collectedAt: { $gte: new Date(new Date().setHours(0,0,0,0)) } });
-    const profiles = await Profile.countDocuments();
-    const affiliateCount = await Thread.countDocuments({ 'affiliate.hasAffiliate': true });
+    const total = await Thread.countDocuments({ 'deletion.isDeleted': { $ne: true } });
+    const today = await Thread.countDocuments({
+      collectedAt: { $gte: new Date(new Date().setHours(0,0,0,0)) },
+      'deletion.isDeleted': { $ne: true }
+    });
+    const profiles = await Thread.distinct('author.username');
+    const affiliateCount = await Thread.countDocuments({ 'affiliate.hasAffiliate': true, 'deletion.isDeleted': { $ne: true } });
     const deleted = await Thread.countDocuments({ 'deletion.isDeleted': true });
+    const domestic = await Thread.countDocuments({ region: 'domestic', 'deletion.isDeleted': { $ne: true } });
+    const overseas = await Thread.countDocuments({ region: 'overseas', 'deletion.isDeleted': { $ne: true } });
+
     const byCat = await Thread.aggregate([
+      { $match: { 'deletion.isDeleted': { $ne: true } } },
       { $group: { _id: '$category.primary', count: { $sum: 1 } } }
     ]);
+    const byRegion = await Thread.aggregate([
+      { $match: { 'deletion.isDeleted': { $ne: true } } },
+      { $group: { _id: { cat: '$category.primary', region: '$region' }, count: { $sum: 1 } } }
+    ]);
     const bySentiment = await Thread.aggregate([
+      { $match: { 'deletion.isDeleted': { $ne: true } } },
       { $group: { _id: '$analysis.sentiment', count: { $sum: 1 } } }
     ]);
-    const byPlatform = await Thread.aggregate([
-      { $match: { 'affiliate.hasAffiliate': true } },
-      { $unwind: '$affiliate.links' },
-      { $group: { _id: '$affiliate.links.platform', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
-    res.json({ success: true, stats: { total, today, profiles, affiliateCount, deleted, byCat, bySentiment, byPlatform } });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+
+    res.json({
+      total, today, profiles: profiles.length, affiliateCount, deleted,
+      domestic, overseas,
+      byCat: byCat.reduce((o, i) => { o[i._id] = i.count; return o; }, {}),
+      byRegion: byRegion.map(i => ({ cat: i._id.cat, region: i._id.region, count: i.count })),
+      bySentiment: bySentiment.reduce((o, i) => { o[i._id] = i.count; return o; }, {}),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Get Threads (with filters) ──
+// ===== Thread list =====
 router.get('/threads', async (req, res) => {
   try {
-    const { category, search, sort, limit = 50, page = 1, includeDeleted } = req.query;
+    const { category, region, search, sort = 'latest', page = 1, limit = 50, includeDeleted } = req.query;
     const filter = {};
+    if (!includeDeleted) filter['deletion.isDeleted'] = { $ne: true };
     if (category && category !== 'all') filter['category.primary'] = category;
-    if (search) filter['content.text'] = { $regex: search, $options: 'i' };
-    if (includeDeleted !== 'true') filter['deletion.isDeleted'] = { $ne: true };
+    if (region && region !== 'all') filter.region = region;
+    if (search) {
+      filter.$or = [
+        { 'content.text': { $regex: search, $options: 'i' } },
+        { 'author.username': { $regex: search, $options: 'i' } },
+        { 'content.hashtags': { $regex: search, $options: 'i' } },
+      ];
+    }
     const sortMap = { latest: { collectedAt: -1 }, popular: { 'metrics.likes': -1 }, engagement: { 'metrics.engagementRate': -1 }, replies: { 'metrics.replies': -1 } };
-    const sortOpt = sortMap[sort] || sortMap.latest;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const threads = await Thread.find(filter).sort(sortOpt).skip(skip).limit(parseInt(limit));
+    const threads = await Thread.find(filter).sort(sortMap[sort] || sortMap.latest).skip((page-1)*limit).limit(Number(limit));
     const total = await Thread.countDocuments(filter);
-    res.json({ success: true, threads, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+    res.json({ threads, total, page: Number(page), pages: Math.ceil(total/limit) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Trending Keywords ──
-router.get('/stats/trending', async (req, res) => {
-  try {
-    const since = new Date(Date.now() - 24*60*60*1000);
-    const result = await Thread.aggregate([
-      { $match: { collectedAt: { $gte: since } } },
-      { $unwind: '$analysis.keywords' },
-      { $group: { _id: '$analysis.keywords', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 15 }
-    ]);
-    res.json({ success: true, keywords: result });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-// ── Manual Collect Trigger ──
+// ===== Manual collect trigger =====
 router.post('/collector/run', async (req, res) => {
   try {
-    const engine = req.app.get('collectorEngine');
-    if (engine) {
-      engine.runOnce().catch(e => logger.error('Manual collect error', e));
-      res.json({ success: true, message: 'Collection started' });
-    } else {
-      res.json({ success: true, message: 'No collector engine configured' });
+    const { accessToken } = req.body;
+    if (!accessToken) {
+      return res.json({ success: false, message: 'Meta Threads API 액세스 토큰이 필요합니다. 환경변수 THREADS_ACCESS_TOKEN을 설정하거나 요청 본문에 accessToken을 포함해주세요.' });
     }
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+    // Fetch user profile
+    const profileRes = await fetch('https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url,threads_biography&access_token=' + accessToken);
+    const profile = await profileRes.json();
+    if (profile.error) return res.json({ success: false, message: 'API 오류: ' + profile.error.message });
+
+    // Fetch user threads
+    const threadsRes = await fetch('https://graph.threads.net/v1.0/me/threads?fields=id,text,timestamp,media_type,media_url,permalink,is_quote_post,shortcode&limit=25&access_token=' + accessToken);
+    const threadsData = await threadsRes.json();
+    if (threadsData.error) return res.json({ success: false, message: 'API 오류: ' + threadsData.error.message });
+
+    let saved = 0;
+    for (const t of (threadsData.data || [])) {
+      const exists = await Thread.findOne({ threadId: t.id });
+      if (exists) continue;
+
+      const mediaType = (t.media_type || 'TEXT').toLowerCase();
+      const mappedMedia = mediaType === 'text_post' ? 'text' : mediaType === 'image' ? 'image' : mediaType === 'video' ? 'video' : mediaType === 'carousel_album' ? 'carousel' : 'text';
+
+      const hashtags = (t.text || '').match(/#[\w\uAC00-\uD7A3]+/g) || [];
+      const mentions = (t.text || '').match(/@[\w.]+/g) || [];
+      const urls = (t.text || '').match(/https?:\/\/[^\s]+/g) || [];
+
+      const isKorean = /[\uAC00-\uD7A3]/.test(t.text || '');
+      const hasAliexpress = urls.some(u => /ali/i.test(u));
+      const hasCoupang = urls.some(u => /coupang/i.test(u));
+      const hasAmazon = urls.some(u => /amzn|amazon/i.test(u));
+      const hasRakuten = urls.some(u => /rakuten/i.test(u));
+      const hasAffiliate = hasAliexpress || hasCoupang || hasAmazon || hasRakuten;
+      const affLinks = [];
+      if (hasAliexpress) affLinks.push({ url: urls.find(u => /ali/i.test(u)), platform: 'aliexpress', detectedIn: 'content' });
+      if (hasCoupang) affLinks.push({ url: urls.find(u => /coupang/i.test(u)), platform: 'coupang', detectedIn: 'content' });
+      if (hasAmazon) affLinks.push({ url: urls.find(u => /amzn|amazon/i.test(u)), platform: 'amazon', detectedIn: 'content' });
+      if (hasRakuten) affLinks.push({ url: urls.find(u => /rakuten/i.test(u)), platform: 'rakuten', detectedIn: 'content' });
+
+      let catPrimary = 'personal';
+      if (hasAffiliate || /(\uD560\uC778|\uCFE0\uD3F0|\uB9C1\uD06C|\uC138\uC77C|\uCC5C\uC800\uAC00|\uBC30\uC1A1|\uB9AC\uBDF0|\uCD94\uCC9C)/i.test(t.text || '')) catPrimary = 'shopping';
+      else if (/(\uC18D\uBCF4|\uB17C\uB780|\uADDC\uC81C|\uC120\uAC70|\uC815\uCE58|\uACBD\uC81C|\uC0AC\uD68C|\uC0AC\uAC74|\uC774\uC288)/i.test(t.text || '')) catPrimary = 'issue';
+
+      const region = isKorean ? 'domestic' : 'overseas';
+
+      await Thread.create({
+        threadId: t.id,
+        originalUrl: t.permalink || '',
+        author: {
+          username: profile.username || 'unknown',
+          userId: profile.id,
+          displayName: profile.name || profile.username,
+          profilePicUrl: profile.threads_profile_picture_url || '',
+          isVerified: false,
+        },
+        content: {
+          text: t.text || '',
+          mediaType: mappedMedia,
+          mediaUrls: t.media_url ? [t.media_url] : [],
+          thumbnailUrl: mappedMedia === 'image' || mappedMedia === 'video' ? (t.media_url || '') : '',
+          videoUrl: mappedMedia === 'video' ? (t.media_url || '') : '',
+          urls, hashtags, mentions,
+        },
+        category: { primary: catPrimary, sub: '', confidence: 0.7, classifiedBy: 'rule' },
+        region,
+        affiliate: { hasAffiliate, links: affLinks },
+        metrics: { likes: 0, replies: 0, reposts: 0, quotes: 0, engagementRate: 0 },
+        analysis: { sentiment: 'neutral', keywords: hashtags.map(h => h.replace('#','')).slice(0,5), language: isKorean ? 'ko' : 'en' },
+        publishedAt: t.timestamp ? new Date(t.timestamp) : new Date(),
+        collectedAt: new Date(),
+        source: 'official_api',
+      });
+      saved++;
+    }
+    res.json({ success: true, message: saved + '개 스레드 수집 완료 (' + profile.username + ')', total: saved, profile: profile.username });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// ── Collector Status ──
+// ===== Collector status =====
 router.get('/collector/status', async (req, res) => {
-  try {
-    const engine = req.app.get('collectorEngine');
-    const status = engine ? { running: engine.isRunning, totalCollected: engine.totalCollected || 0, errors: engine.errorCount || 0 } : { running: false, totalCollected: 0, errors: 0 };
-    res.json({ success: true, ...status });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  res.json({ running: false, lastRun: null, nextRun: null, hasToken: !!process.env.THREADS_ACCESS_TOKEN });
 });
 
-// ── Profiles ──
-router.get('/profiles', async (req, res) => {
-  try {
-    const profiles = await Profile.find().sort({ 'tracking.lastCollectedAt': -1 });
-    res.json({ success: true, profiles });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-router.post('/profiles', async (req, res) => {
-  try {
-    const { username } = req.body;
-    if (!username) return res.status(400).json({ success: false, error: 'username required' });
-    const existing = await Profile.findOne({ username: username.replace('@','') });
-    if (existing) return res.json({ success: true, profile: existing, message: 'Already tracking' });
-    const profile = await Profile.create({ username: username.replace('@',''), tracking: { isActive: true } });
-    res.json({ success: true, profile });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-// ── Seed Demo Data (rich, realistic) ──
+// ===== Seed demo data =====
 router.post('/seed-demo', async (req, res) => {
   try {
     await Thread.deleteMany({});
     const now = new Date();
-    const h = (n) => new Date(now.getTime() - n*60*60*1000);
+    const ago = (m) => new Date(now - m * 60000);
+
     const threads = [
-      { threadId: 'thread_ali_001', originalUrl: 'https://www.threads.net/@deal_hunter_kr/post/abc1',
-        author: { username: 'deal_hunter_kr', displayName: '\ud574\uc678\uc9c1\uad6c \ub9c8\uc2a4\ud130', profilePicUrl: 'https://picsum.photos/seed/ali1/100', followerCount: 45200, isVerified: false },
-        content: { text: '\ud83d\udd25 \uc54c\ub9ac \uc5ed\ub300\uae09 \ud560\uc778! \uc5d0\uc5b4\ud31f \ub9e5\uc2a4 \ud638\ud658 \ucf00\uc774\uc2a4 $2.99 \ub9c1\ud06c\ub294 \ud504\ub85c\ud544\uc5d0! #\uc54c\ub9ac\uc775\uc2a4\ud504\ub808\uc2a4 #\ud560\uc778 #\uc5d0\uc5b4\ud31f\ub9e5\uc2a4',
-          mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/airpod1/600/400','https://picsum.photos/seed/airpod2/600/400'], thumbnailUrl: 'https://picsum.photos/seed/airpod1/300/200',
-          hashtags: ['\uc54c\ub9ac\uc775\uc2a4\ud504\ub808\uc2a4','\ud560\uc778','\uc5d0\uc5b4\ud31f\ub9e5\uc2a4'], urls: ['https://ali.ski/abc123'] },
-        category: { primary: 'shopping', sub: 'AliExpress', confidence: 0.95, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: true, links: [{ url: 'https://ali.ski/abc123', platform: 'aliexpress', shortUrl: 'ali.ski/abc123', detectedIn: 'content' }] },
-        metrics: { likes: 2340, replies: 189, reposts: 567, engagementRate: 94 },
-        analysis: { sentiment: 'positive', keywords: ['\uc54c\ub9ac','\ud560\uc778','\uc5d0\uc5b4\ud31f','\ub9e5\uc2a4','\ucf00\uc774\uc2a4'], viralScore: 82 },
-        publishedAt: h(2), collectedAt: h(1), source: 'scraper' },
-
-      { threadId: 'thread_cpg_001', originalUrl: 'https://www.threads.net/@coupang_picks/post/abc2',
-        author: { username: 'coupang_picks', displayName: '\ucfe0\ud321 \ud575\ub51c \uc815\ubcf4', profilePicUrl: 'https://picsum.photos/seed/cpg1/100', followerCount: 89300, isVerified: true },
-        content: { text: '\ud83d\udce6 \ucfe0\ud321 \ub85c\ucf13\ubc30\uc1a1 \uc624\ub298\uc758 \ud575\ub51c TOP5 \uc815\ub9ac\ud588\uc2b5\ub2c8\ub2e4! \ub313\uae00\uc5d0 \ub9c1\ud06c \uc788\uc5b4\uc694 #\ucfe0\ud321 #\ud575\ub51c #\ub85c\ucf13\ubc30\uc1a1',
-          mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/cpg2/600/400','https://picsum.photos/seed/cpg3/600/400','https://picsum.photos/seed/cpg4/600/400'], thumbnailUrl: 'https://picsum.photos/seed/cpg2/300/200',
-          hashtags: ['\ucfe0\ud321','\ud575\ub51c','\ub85c\ucf13\ubc30\uc1a1'], urls: ['https://link.coupang.com/xyz789'] },
-        category: { primary: 'shopping', sub: '\ucfe0\ud321\ud30c\ud2b8\ub108\uc2a4', confidence: 0.98, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/xyz789', platform: 'coupang', shortUrl: 'link.coupang.com/xyz789', detectedIn: 'content' }] },
+      // === 국내 쇼핑 ===
+      {
+        threadId: 'demo_kr_shop_1', originalUrl: 'https://threads.net/@coupang_picks/1',
+        author: { username: 'coupang_picks', displayName: '쿠팡 추천마니아', profilePicUrl: 'https://picsum.photos/seed/cp1/100', followerCount: 45000, isVerified: true },
+        content: { text: '🎁 쿠팡 로켓배송 오늘의 핵딜 TOP5 정리했습니다! 댓글에 링크 있어요 #쿠팡 #핵딜 #로켓배송', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/shop1/600/400','https://picsum.photos/seed/shop1b/600/400','https://picsum.photos/seed/shop1c/600/400'], thumbnailUrl: 'https://picsum.photos/seed/shop1/600/400', urls: ['https://link.coupang.com/xyz789'], hashtags: ['#쿠팡','#핵딜','#로켓배송'] },
+        category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.95, classifiedBy: 'rule' },
+        region: 'domestic',
+        affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/xyz789', platform: 'coupang', detectedIn: 'content' }] },
         metrics: { likes: 1890, replies: 312, reposts: 445, engagementRate: 88 },
-        analysis: { sentiment: 'positive', keywords: ['\ucfe0\ud321','\ud575\ub51c','\ub85c\ucf13\ubc30\uc1a1','TOP5'], viralScore: 76 },
-        publishedAt: h(3), collectedAt: h(2), source: 'scraper' },
-
-      { threadId: 'thread_amz_001', originalUrl: 'https://www.threads.net/@us_deal_master/post/abc3',
-        author: { username: 'us_deal_master', displayName: '\ubbf8\uad6d\uc9c1\uad6c \ub2ec\uc778', profilePicUrl: 'https://picsum.photos/seed/amz1/100', followerCount: 67800, isVerified: false },
-        content: { text: '\ud83c\uddfa\ud83c\uddf8 \uc544\ub9c8\uc874 \ud504\ub77c\uc784\ub370\uc774 \uc0ac\uc804 \ud560\uc778 \uc2dc\uc791! \uac24\ub7ed\uc2dc \ubc84\uc9883 \ud504\ub85c \uc5ed\ub300 \ucd5c\uc800\uac00 #\uc544\ub9c8\uc874 #\ud504\ub77c\uc784\ub370\uc774 #\uac24\ub7ed\uc2dc\ubc84\uc988',
-          mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/amzv/600/400'], thumbnailUrl: 'https://picsum.photos/seed/amzv/300/200', videoUrl: 'https://example.com/video1.mp4',
-          hashtags: ['\uc544\ub9c8\uc874','\ud504\ub77c\uc784\ub370\uc774','\uac24\ub7ed\uc2dc\ubc84\uc988'], urls: ['https://amzn.to/def456'] },
+        analysis: { sentiment: 'positive', keywords: ['쿠팡','핵딜','로켓배송'], viralScore: 75, language: 'ko' },
+        publishedAt: ago(120), source: 'scraper',
+      },
+      {
+        threadId: 'demo_kr_shop_2', originalUrl: 'https://threads.net/@beauty_haul_kr/2',
+        author: { username: 'beauty_haul_kr', displayName: '뷰티하울', profilePicUrl: 'https://picsum.photos/seed/bh1/100', followerCount: 23000, isVerified: false },
+        content: { text: '💄 올리브영 립오일 50% 할인! 이건 진짜 나만 아는 가격이에요... 링크 프로필에 #올리브영 #립오일 #뷰티딜', mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/beauty1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/beauty1/600/400', videoUrl: 'https://example.com/video1.mp4', urls: ['https://link.coupang.com/beauty01'], hashtags: ['#올리브영','#립오일','#뷰티딜'] },
+        category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.92, classifiedBy: 'rule' },
+        region: 'domestic',
+        affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/beauty01', platform: 'coupang', detectedIn: 'content' }] },
+        metrics: { likes: 3400, replies: 567, reposts: 234, engagementRate: 91 },
+        analysis: { sentiment: 'positive', keywords: ['올리브영','립오일','할인'], viralScore: 82, language: 'ko' },
+        publishedAt: ago(90), source: 'scraper',
+      },
+      // === 해외 쇼핑 ===
+      {
+        threadId: 'demo_os_shop_1', originalUrl: 'https://threads.net/@deal_hunter_kr/3',
+        author: { username: 'deal_hunter_kr', displayName: '딜헌터KR', profilePicUrl: 'https://picsum.photos/seed/dh1/100', followerCount: 18000, isVerified: false },
+        content: { text: '🔥 알리 역대급 할인! 에어팟 맥스 호환 케이스 $2.99 링크는 프로필에! #알리익스프레스 #할인 #에어팟맥스', mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/ali1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/ali1/600/400', urls: ['https://ali.ski/abc123'], hashtags: ['#알리익스프레스','#할인','#에어팟맥스'] },
+        category: { primary: 'shopping', sub: 'AliExpress', confidence: 0.95, classifiedBy: 'rule' },
+        region: 'overseas',
+        affiliate: { hasAffiliate: true, links: [{ url: 'https://ali.ski/abc123', platform: 'aliexpress', detectedIn: 'content' }] },
+        metrics: { likes: 2340, replies: 189, reposts: 567, engagementRate: 94 },
+        analysis: { sentiment: 'positive', keywords: ['알리익스프레스','할인','에어팟맥스'], viralScore: 80, language: 'ko' },
+        publishedAt: ago(60), source: 'scraper',
+      },
+      {
+        threadId: 'demo_os_shop_2', originalUrl: 'https://threads.net/@us_deal_master/4',
+        author: { username: 'us_deal_master', displayName: '미국직구마스터', profilePicUrl: 'https://picsum.photos/seed/us1/100', followerCount: 32000, isVerified: true },
+        content: { text: '🇺🇸 아마존 프라임데이 사전 할인 시작! 갤럭시 버즈3 프로 역대 최저가 #아마존 #프라임데이 #갤럭시버즈', mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/amz1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/amz1/600/400', videoUrl: 'https://example.com/video2.mp4', urls: ['https://amzn.to/def456'], hashtags: ['#아마존','#프라임데이','#갤럭시버즈'] },
         category: { primary: 'shopping', sub: 'Amazon', confidence: 0.96, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: true, links: [{ url: 'https://amzn.to/def456', platform: 'amazon', shortUrl: 'amzn.to/def456', detectedIn: 'content' }] },
+        region: 'overseas',
+        affiliate: { hasAffiliate: true, links: [{ url: 'https://amzn.to/def456', platform: 'amazon', detectedIn: 'content' }] },
         metrics: { likes: 3210, replies: 456, reposts: 789, engagementRate: 97 },
-        analysis: { sentiment: 'positive', keywords: ['\uc544\ub9c8\uc874','\ud504\ub77c\uc784\ub370\uc774','\uac24\ub7ed\uc2dc','\ubc84\uc988','\ucd5c\uc800\uac00'], viralScore: 91 },
-        publishedAt: h(4), collectedAt: h(3), source: 'scraper' },
-
-      { threadId: 'thread_rktn_001', originalUrl: 'https://www.threads.net/@japan_deal_info/post/abc4',
-        author: { username: 'japan_deal_info', displayName: '\uc77c\ubcf8\uc9c1\uad6c \uc815\ubcf4', profilePicUrl: 'https://picsum.photos/seed/jpn1/100', followerCount: 23400, isVerified: false },
-        content: { text: '\ud83c\uddef\ud83c\uddf5 \ub77c\ucfe0\ud150 \uc288\ud37c\uc138\uc77c \uc2dc\uc791! \uc77c\ubcf8 \uc9c1\uad6c \ud544\uc218\ud15c \ub9ac\uc2a4\ud2b8 \uc5c5\ub370\uc774\ud2b8 #\ub77c\ucfe0\ud150 #\uc77c\ubcf8\uc9c1\uad6c',
-          mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/rktn1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/rktn1/300/200',
-          hashtags: ['\ub77c\ucfe0\ud150','\uc77c\ubcf8\uc9c1\uad6c'], urls: ['https://a.r10.to/ghi789'] },
-        category: { primary: 'shopping', sub: 'Rakuten', confidence: 0.92, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: true, links: [{ url: 'https://a.r10.to/ghi789', platform: 'rakuten', shortUrl: 'a.r10.to/ghi789', detectedIn: 'content' }] },
+        analysis: { sentiment: 'positive', keywords: ['아마존','프라임데이','갤럭시'], viralScore: 90, language: 'ko' },
+        publishedAt: ago(180), source: 'scraper',
+      },
+      {
+        threadId: 'demo_os_shop_3', originalUrl: 'https://threads.net/@japan_deal_info/5',
+        author: { username: 'japan_deal_info', displayName: '일본직구정보', profilePicUrl: 'https://picsum.photos/seed/jp1/100', followerCount: 15000, isVerified: false },
+        content: { text: '🇯🇵 라쿠텐 슈퍼세일 시작! 일본 직구 필수템 리스트 업데이트 #라쿠텐 #일본직구', mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/rkt1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/rkt1/600/400', urls: ['https://a.r10.to/ghi789'], hashtags: ['#라쿠텐','#일본직구'] },
+        category: { primary: 'shopping', sub: 'Rakuten', confidence: 0.93, classifiedBy: 'rule' },
+        region: 'overseas',
+        affiliate: { hasAffiliate: true, links: [{ url: 'https://a.r10.to/ghi789', platform: 'rakuten', detectedIn: 'content' }] },
         metrics: { likes: 1560, replies: 234, reposts: 445, engagementRate: 76 },
-        analysis: { sentiment: 'positive', keywords: ['\ub77c\ucfe0\ud150','\uc77c\ubcf8','\uc9c1\uad6c','\uc138\uc77c'], viralScore: 65 },
-        publishedAt: h(5), collectedAt: h(4), source: 'scraper' },
-
-      { threadId: 'thread_ent_001', originalUrl: 'https://www.threads.net/@ent_news_live/post/abc5',
-        author: { username: 'ent_news_live', displayName: '\uc5f0\uc608\ub274\uc2a4 \uc18d\ubcf4', profilePicUrl: 'https://picsum.photos/seed/ent1/100', followerCount: 234000, isVerified: true },
-        content: { text: '\ud83c\udfa4 \uc18d\ubcf4: BTS \uc9c0\ubbfc \uc194\ub85c \uc6d4\ub4dc\ud22c\uc5b4 \uc77c\uc815 \uacf5\uac1c! \uc11c\uc6b8 \ucf58\uc11c\ud2b8 3\ud68c \ud655\uc815 #BTS #\uc9c0\ubbfc #\uc6d4\ub4dc\ud22c\uc5b4',
-          mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/bts1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/bts1/300/200',
-          hashtags: ['BTS','\uc9c0\ubbfc','\uc6d4\ub4dc\ud22c\uc5b4'] },
-        category: { primary: 'issue', sub: '\uc5f0\uc608', confidence: 0.99, classifiedBy: 'rule' },
+        analysis: { sentiment: 'positive', keywords: ['라쿠텐','일본직구','세일'], viralScore: 65, language: 'ko' },
+        publishedAt: ago(150), source: 'scraper',
+      },
+      // === 국내 이슈 ===
+      {
+        threadId: 'demo_kr_issue_1', originalUrl: 'https://threads.net/@ent_news_live/6',
+        author: { username: 'ent_news_live', displayName: '연예뉴스라이브', profilePicUrl: 'https://picsum.photos/seed/ent1/100', followerCount: 120000, isVerified: true },
+        content: { text: '🎤 속보: BTS 지민 솔로 월드투어 일정 공개! 서울 콘서트 3회 확정 #BTS #지민 #월드투어', mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/bts1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/bts1/600/400', hashtags: ['#BTS','#지민','#월드투어'] },
+        category: { primary: 'issue', sub: '연예', confidence: 0.97, classifiedBy: 'rule' },
+        region: 'domestic',
         affiliate: { hasAffiliate: false, links: [] },
         metrics: { likes: 45200, replies: 8900, reposts: 12300, engagementRate: 99 },
-        analysis: { sentiment: 'positive', keywords: ['BTS','\uc9c0\ubbfc','\uc6d4\ub4dc\ud22c\uc5b4','\uc11c\uc6b8','\ucf58\uc11c\ud2b8'], viralScore: 99 },
-        publishedAt: h(1), collectedAt: h(0.5), source: 'scraper' },
-
-      { threadId: 'thread_pol_001', originalUrl: 'https://www.threads.net/@politics_watch/post/abc6',
-        author: { username: 'politics_watch', displayName: '\uc2dc\uc0ac\uc6cc\uce58', profilePicUrl: 'https://picsum.photos/seed/pol1/100', followerCount: 56700, isVerified: true },
-        content: { text: '\ud83c\udfdb\ufe0f \uad6d\ud68c AI \uaddc\uc81c\ubc95\uc548 \ubcf8\ud68c\uc758 \ud1b5\uacfc... \uc5c5\uacc4 \ubc18\uc751 \uc5c7\uac08\ub824 #AI\uaddc\uc81c #\uad6d\ud68c #\ubc95\uc548\ud1b5\uacfc',
-          mediaType: 'text', hashtags: ['AI\uaddc\uc81c','\uad6d\ud68c','\ubc95\uc548\ud1b5\uacfc'] },
-        category: { primary: 'issue', sub: '\uc2dc\uc0ac', confidence: 0.91, classifiedBy: 'rule' },
+        analysis: { sentiment: 'positive', keywords: ['BTS','지민','월드투어','콘서트'], viralScore: 99, language: 'ko' },
+        publishedAt: ago(20), source: 'scraper',
+      },
+      {
+        threadId: 'demo_kr_issue_2', originalUrl: 'https://threads.net/@politics_watch/7',
+        author: { username: 'politics_watch', displayName: '정치워치', profilePicUrl: 'https://picsum.photos/seed/pol1/100', followerCount: 67000, isVerified: true },
+        content: { text: '🏛️ 국회 AI 규제법안 본회의 통과... 업계 반응 엇갈리는 #AI규제 #국회 #법안통과', mediaType: 'text', hashtags: ['#AI규제','#국회','#법안통과'] },
+        category: { primary: 'issue', sub: '시사', confidence: 0.94, classifiedBy: 'rule' },
+        region: 'domestic',
         affiliate: { hasAffiliate: false, links: [] },
         metrics: { likes: 8900, replies: 2340, reposts: 3400, engagementRate: 85 },
-        analysis: { sentiment: 'neutral', keywords: ['AI','\uaddc\uc81c','\uad6d\ud68c','\ubc95\uc548','\ud1b5\uacfc'], viralScore: 78 },
-        publishedAt: h(2), collectedAt: h(1), source: 'scraper' },
-
-      { threadId: 'thread_eco_001', originalUrl: 'https://www.threads.net/@money_signal/post/abc7',
-        author: { username: 'money_signal', displayName: '\ub9e4\ub2c8\uc2dc\uadf8\ub110', profilePicUrl: 'https://picsum.photos/seed/eco1/100', followerCount: 78900, isVerified: false },
-        content: { text: '\ud83d\udcb0 \ubbf8 \uc5f0\uc900 \uae08\ub9ac \ub3d9\uacb0 \uc804\ub9dd \uc6b0\uc138... \ucf54\uc2a4\ud53c 3,200 \ub3cc\ud30c \uac00\ub2a5\uc131\uc740? #\uae08\ub9ac #\ucf54\uc2a4\ud53c #\uc5f0\uc900',
-          mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/stock1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/stock1/300/200',
-          hashtags: ['\uae08\ub9ac','\ucf54\uc2a4\ud53c','\uc5f0\uc900'] },
-        category: { primary: 'issue', sub: '\uacbd\uc81c', confidence: 0.93, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: false, links: [] },
-        metrics: { likes: 5600, replies: 890, reposts: 1200, engagementRate: 78 },
-        analysis: { sentiment: 'neutral', keywords: ['\uae08\ub9ac','\ucf54\uc2a4\ud53c','\uc5f0\uc900','\ub3d9\uacb0'], viralScore: 72 },
-        publishedAt: h(3), collectedAt: h(2), source: 'scraper' },
-
-      { threadId: 'thread_tech_001', originalUrl: 'https://www.threads.net/@tech_insider_kr/post/abc8',
-        author: { username: 'tech_insider_kr', displayName: '\ud14c\ud06c\uc778\uc0ac\uc774\ub354', profilePicUrl: 'https://picsum.photos/seed/tech1/100', followerCount: 123000, isVerified: true },
-        content: { text: '\ud83d\udcbb OpenAI GPT-5 \ucd9c\uc2dc \uc784\ubc15\uc124... \uba40\ud2f0\ubaa8\ub2ec \uc131\ub2a5 \ub300\ud3ed \ud5a5\uc0c1 \uc608\uace0 #OpenAI #GPT5 #AI',
-          mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/gpt5/600/400'], thumbnailUrl: 'https://picsum.photos/seed/gpt5/300/200',
-          hashtags: ['OpenAI','GPT5','AI'] },
-        category: { primary: 'issue', sub: 'IT/\ud14c\ud06c', confidence: 0.97, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: false, links: [] },
-        metrics: { likes: 12400, replies: 3200, reposts: 5600, engagementRate: 92 },
-        analysis: { sentiment: 'positive', keywords: ['OpenAI','GPT-5','\uba40\ud2f0\ubaa8\ub2ec','AI'], viralScore: 88 },
-        publishedAt: h(4), collectedAt: h(3), source: 'scraper' },
-
-      { threadId: 'thread_sport_001', originalUrl: 'https://www.threads.net/@sports_flash/post/abc9',
-        author: { username: 'sports_flash', displayName: '\uc2a4\ud3ec\uce20\ud50c\ub798\uc2dc', profilePicUrl: 'https://picsum.photos/seed/spt1/100', followerCount: 189000, isVerified: true },
-        content: { text: '\u26bd \uc190\ud765\ubbfc \uc2dc\uc98c 20\ud638\uace8 \ud3ed\ubc1c! EPL \ub4dd\uc810\uc655 \uacbd\uc7c1 \ubcf8\uaca9\ud654 #\uc190\ud765\ubbfc #EPL #\ub4dd\uc810\uc655',
-          mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/son1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/son1/300/200',
-          hashtags: ['\uc190\ud765\ubbfc','EPL','\ub4dd\uc810\uc655'] },
-        category: { primary: 'issue', sub: '\uc2a4\ud3ec\uce20', confidence: 0.99, classifiedBy: 'rule' },
+        analysis: { sentiment: 'neutral', keywords: ['AI규제','국회','법안'], viralScore: 78, language: 'ko' },
+        publishedAt: ago(100), source: 'scraper',
+      },
+      {
+        threadId: 'demo_kr_issue_3', originalUrl: 'https://threads.net/@sports_flash/8',
+        author: { username: 'sports_flash', displayName: '스포츠플래시', profilePicUrl: 'https://picsum.photos/seed/sp1/100', followerCount: 89000, isVerified: true },
+        content: { text: '⚽ 손흥민 시즌 20호골 폭발! EPL 득점왕 경쟁 본격화 #손흥민 #EPL #득점왕', mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/son1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/son1/600/400', videoUrl: 'https://example.com/son.mp4', hashtags: ['#손흥민','#EPL','#득점왕'] },
+        category: { primary: 'issue', sub: '스포츠', confidence: 0.96, classifiedBy: 'rule' },
+        region: 'domestic',
         affiliate: { hasAffiliate: false, links: [] },
         metrics: { likes: 34500, replies: 5600, reposts: 8900, engagementRate: 96 },
-        analysis: { sentiment: 'positive', keywords: ['\uc190\ud765\ubbfc','EPL','\ub4dd\uc810\uc655','20\ud638\uace8'], viralScore: 95 },
-        publishedAt: h(1), collectedAt: h(0.5), source: 'scraper' },
-
-      { threadId: 'thread_mkt_001', originalUrl: 'https://www.threads.net/@growth_hacker_jin/post/abc10',
-        author: { username: 'growth_hacker_jin', displayName: '\uadf8\ub85c\uc2a4\ud574\ucee4 \uc9c4', profilePicUrl: 'https://picsum.photos/seed/mkt1/100', followerCount: 34500, isVerified: false },
-        content: { text: '\ud83d\ude80 \uc2a4\ub808\ub4dc \uc54c\uace0\ub9ac\uc998 \uc644\uc804 \ubd84\uc11d! \ub3c4\ub2ec\ub960 300% \uc62c\ub9ac\ub294 5\uac00\uc9c0 \ud301 \uacf5\uac1c\ud569\ub2c8\ub2e4 #\ub9c8\ucf00\ud305 #\uc2a4\ub808\ub4dc #\uc54c\uace0\ub9ac\uc998',
-          mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/mkt2/600/400','https://picsum.photos/seed/mkt3/600/400'], thumbnailUrl: 'https://picsum.photos/seed/mkt2/300/200',
-          hashtags: ['\ub9c8\ucf00\ud305','\uc2a4\ub808\ub4dc','\uc54c\uace0\ub9ac\uc998'] },
-        category: { primary: 'personal', sub: '\ub9c8\ucf00\ud305', confidence: 0.94, classifiedBy: 'rule' },
+        analysis: { sentiment: 'positive', keywords: ['손흥민','EPL','득점왕'], viralScore: 95, language: 'ko' },
+        publishedAt: ago(30), source: 'scraper',
+      },
+      // === 해외 이슈 ===
+      {
+        threadId: 'demo_os_issue_1', originalUrl: 'https://threads.net/@tech_insider_kr/9',
+        author: { username: 'tech_insider_kr', displayName: '테크인사이더', profilePicUrl: 'https://picsum.photos/seed/tech1/100', followerCount: 95000, isVerified: true },
+        content: { text: '💻 OpenAI GPT-5 출시 임박설... 멀티모달 성능 대폭 향상 예고 #OpenAI #GPT5 #AI', mediaType: 'video', mediaUrls: ['https://picsum.photos/seed/gpt1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/gpt1/600/400', videoUrl: 'https://example.com/gpt5.mp4', hashtags: ['#OpenAI','#GPT5','#AI'] },
+        category: { primary: 'issue', sub: 'IT/테크', confidence: 0.95, classifiedBy: 'rule' },
+        region: 'overseas',
+        affiliate: { hasAffiliate: false, links: [] },
+        metrics: { likes: 12400, replies: 3200, reposts: 5600, engagementRate: 92 },
+        analysis: { sentiment: 'positive', keywords: ['OpenAI','GPT5','AI','멀티모달'], viralScore: 88, language: 'ko' },
+        publishedAt: ago(200), source: 'scraper',
+      },
+      {
+        threadId: 'demo_os_issue_2', originalUrl: 'https://threads.net/@money_signal/10',
+        author: { username: 'money_signal', displayName: '머니시그널', profilePicUrl: 'https://picsum.photos/seed/money1/100', followerCount: 54000, isVerified: false },
+        content: { text: '💰 미 연준 금리 동결 전망 우세... 코스피 3,200 돌파 가능성은? #금리 #코스피 #연준', mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/stock1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/stock1/600/400', hashtags: ['#금리','#코스피','#연준'] },
+        category: { primary: 'issue', sub: '경제', confidence: 0.93, classifiedBy: 'rule' },
+        region: 'overseas',
+        affiliate: { hasAffiliate: false, links: [] },
+        metrics: { likes: 5600, replies: 890, reposts: 1200, engagementRate: 78 },
+        analysis: { sentiment: 'neutral', keywords: ['금리','코스피','연준'], viralScore: 70, language: 'ko' },
+        publishedAt: ago(140), source: 'scraper',
+      },
+      // === 국내 퍼스널 ===
+      {
+        threadId: 'demo_kr_personal_1', originalUrl: 'https://threads.net/@growth_hacker_jin/11',
+        author: { username: 'growth_hacker_jin', displayName: '그로스해커진', profilePicUrl: 'https://picsum.photos/seed/gh1/100', followerCount: 28000, isVerified: false },
+        content: { text: '🚀 스레드 알고리즘 완전 분석! 도달율 300% 올리는 5가지 팁 공개합니다 #마케팅 #스레드 #알고리즘', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/mk1/600/400','https://picsum.photos/seed/mk2/600/400'], thumbnailUrl: 'https://picsum.photos/seed/mk1/600/400', hashtags: ['#마케팅','#스레드','#알고리즘'] },
+        category: { primary: 'personal', sub: '마케팅', confidence: 0.91, classifiedBy: 'rule' },
+        region: 'domestic',
         affiliate: { hasAffiliate: false, links: [] },
         metrics: { likes: 6700, replies: 890, reposts: 2300, engagementRate: 91 },
-        analysis: { sentiment: 'positive', keywords: ['\uc2a4\ub808\ub4dc','\uc54c\uace0\ub9ac\uc998','\ub3c4\ub2ec\ub960','\ub9c8\ucf00\ud305'], viralScore: 84 },
-        publishedAt: h(1), collectedAt: h(0.5), source: 'scraper' },
-
-      { threadId: 'thread_inv_001', originalUrl: 'https://www.threads.net/@warren_kr/post/abc11',
-        author: { username: 'warren_kr', displayName: '\ud55c\uad6d\uc758 \uc6cc\ub80c', profilePicUrl: 'https://picsum.photos/seed/inv1/100', followerCount: 98700, isVerified: false },
-        content: { text: '\ud83d\udcc8 2026\ub144 \uc0c1\ubc18\uae30 \ud3ec\ud2b8\ud3f4\ub9ac\uc624 \ub9ac\ubc38\ub7f0\uc2f1 \uc804\ub7b5. \ubc18\ub3c4\uccb4 \ube44\uc911 \ud655\ub300 \uc774\uc720\ub294... #\ud22c\uc790 #\ud3ec\ud2b8\ud3f4\ub9ac\uc624 #\ubc18\ub3c4\uccb4',
-          mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/inv2/600/400'], thumbnailUrl: 'https://picsum.photos/seed/inv2/300/200',
-          hashtags: ['\ud22c\uc790','\ud3ec\ud2b8\ud3f4\ub9ac\uc624','\ubc18\ub3c4\uccb4'] },
-        category: { primary: 'personal', sub: '\ud22c\uc790', confidence: 0.90, classifiedBy: 'rule' },
-        affiliate: { hasAffiliate: false, links: [] },
-        metrics: { likes: 9800, replies: 1560, reposts: 3400, engagementRate: 89 },
-        analysis: { sentiment: 'neutral', keywords: ['\ud3ec\ud2b8\ud3f4\ub9ac\uc624','\ubc18\ub3c4\uccb4','\ud22c\uc790','2026'], viralScore: 80 },
-        publishedAt: h(3), collectedAt: h(2), source: 'scraper' },
-
-      { threadId: 'thread_des_001', originalUrl: 'https://www.threads.net/@design_muse/post/abc12',
-        author: { username: 'design_muse', displayName: '\ub514\uc790\uc778\ubba4\uc988', profilePicUrl: 'https://picsum.photos/seed/des1/100', followerCount: 45600, isVerified: false },
-        content: { text: '\ud83c\udfa8 Figma AI \uae30\ub2a5 \uc2e4\ubb34 \ud65c\uc6a9\ubc95 \ucd1d\uc815\ub9ac. \ub514\uc790\uc774\ub108 \uc0dd\uc0b0\uc131 2\ubc30 \uc62c\ub9ac\uae30 #Figma #\ub514\uc790\uc778 #AI',
-          mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/fig1/600/400','https://picsum.photos/seed/fig2/600/400','https://picsum.photos/seed/fig3/600/400'], thumbnailUrl: 'https://picsum.photos/seed/fig1/300/200',
-          hashtags: ['Figma','\ub514\uc790\uc778','AI'] },
-        category: { primary: 'personal', sub: '\ub514\uc790\uc778', confidence: 0.88, classifiedBy: 'rule' },
+        analysis: { sentiment: 'positive', keywords: ['스레드','알고리즘','도달율','마케팅'], viralScore: 83, language: 'ko' },
+        publishedAt: ago(35), source: 'scraper',
+      },
+      {
+        threadId: 'demo_kr_personal_2', originalUrl: 'https://threads.net/@design_muse/12',
+        author: { username: 'design_muse', displayName: '디자인뮤즈', profilePicUrl: 'https://picsum.photos/seed/ds1/100', followerCount: 19000, isVerified: false },
+        content: { text: '🎨 Figma AI 기능 실무 활용법 총정리, 디자이너 생산성 2배 올리기 #Figma #디자인 #AI', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/fig1/600/400','https://picsum.photos/seed/fig2/600/400','https://picsum.photos/seed/fig3/600/400'], thumbnailUrl: 'https://picsum.photos/seed/fig1/600/400', hashtags: ['#Figma','#디자인','#AI'] },
+        category: { primary: 'personal', sub: '디자인', confidence: 0.89, classifiedBy: 'rule' },
+        region: 'domestic',
         affiliate: { hasAffiliate: false, links: [] },
         metrics: { likes: 4300, replies: 670, reposts: 1800, engagementRate: 82 },
-        analysis: { sentiment: 'positive', keywords: ['Figma','AI','\ub514\uc790\uc778','\uc0dd\uc0b0\uc131'], viralScore: 73 },
-        publishedAt: h(5), collectedAt: h(4), source: 'scraper' },
-
-      { threadId: 'thread_del_001', originalUrl: 'https://www.threads.net/@deleted_user123/post/abc13',
-        author: { username: 'deleted_user123', displayName: '(\uc0ad\uc81c\ub41c \uacc4\uc815)', profilePicUrl: '', followerCount: 0 },
-        content: { text: '\uc774 \uac8c\uc2dc\ubb3c\uc740 \uc791\uc131\uc790\uc5d0 \uc758\ud574 \uc0ad\uc81c\ub418\uc5c8\uc2b5\ub2c8\ub2e4. \uc6d0\ubcf8 \ub0b4\uc6a9: \uce5c\uad6c\uac00 \uc54c\ub824\uc900 \ucfe0\ud321 \ud560\uc778\ucf54\ub4dc \uacf5\uc720\ud569\ub2c8\ub2e4! #\ud560\uc778\ucf54\ub4dc',
-          mediaType: 'text', hashtags: ['\ud560\uc778\ucf54\ub4dc'] },
-        category: { primary: 'shopping', sub: '\ucfe0\ud321\ud30c\ud2b8\ub108\uc2a4', confidence: 0.85, classifiedBy: 'rule' },
+        analysis: { sentiment: 'positive', keywords: ['Figma','AI','디자인','생산성'], viralScore: 72, language: 'ko' },
+        publishedAt: ago(160), source: 'scraper',
+      },
+      // === 해외 퍼스널 ===
+      {
+        threadId: 'demo_os_personal_1', originalUrl: 'https://threads.net/@warren_kr/13',
+        author: { username: 'warren_kr', displayName: '한국의워렌', profilePicUrl: 'https://picsum.photos/seed/wr1/100', followerCount: 41000, isVerified: false },
+        content: { text: '📈 2026년 상반기 포트폴리오 리밸런싱 전략, 반도체 비중 확대 이유는... #투자 #포트폴리오 #반도체', mediaType: 'image', mediaUrls: ['https://picsum.photos/seed/inv1/600/400'], thumbnailUrl: 'https://picsum.photos/seed/inv1/600/400', hashtags: ['#투자','#포트폴리오','#반도체'] },
+        category: { primary: 'personal', sub: '투자', confidence: 0.88, classifiedBy: 'rule' },
+        region: 'overseas',
+        affiliate: { hasAffiliate: false, links: [] },
+        metrics: { likes: 9800, replies: 1560, reposts: 3400, engagementRate: 89 },
+        analysis: { sentiment: 'neutral', keywords: ['투자','포트폴리오','반도체'], viralScore: 77, language: 'ko' },
+        publishedAt: ago(170), source: 'scraper',
+      },
+      // === 삭제된 콘텐츠 ===
+      {
+        threadId: 'demo_deleted_1', originalUrl: 'https://threads.net/@deleted_user123/14',
+        author: { username: 'deleted_user123', displayName: '삭제된유저', profilePicUrl: '', followerCount: 500, isVerified: false },
+        content: { text: '이 게시물은 작성자에 의해 삭제되었습니다. 원본 내용: 친구가 알려준 쿠팡 할인코드 공유합니다 #할인코드', mediaType: 'text', urls: ['https://link.coupang.com/del001'], hashtags: ['#할인코드'] },
+        category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.8, classifiedBy: 'rule' },
+        region: 'domestic',
         affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/del001', platform: 'coupang', detectedIn: 'content' }] },
         metrics: { likes: 340, replies: 23, reposts: 12, engagementRate: 45 },
-        analysis: { sentiment: 'positive', keywords: ['\ucfe0\ud321','\ud560\uc778\ucf54\ub4dc'], viralScore: 30 },
-        deletion: { isDeleted: true, deletedAt: h(1), detectedAt: h(0.5), reason: 'user_deleted' },
-        publishedAt: h(8), collectedAt: h(6), source: 'scraper' },
+        analysis: { sentiment: 'positive', keywords: ['쿠팡','할인코드'], viralScore: 20, language: 'ko' },
+        deletion: { isDeleted: true, deletedAt: ago(30), detectedAt: ago(25), reason: 'user_deleted' },
+        publishedAt: ago(300), source: 'scraper',
+      },
     ];
 
-    const inserted = await Thread.insertMany(threads);
-    res.json({ success: true, message: inserted.length + ' demo threads added (including 1 deleted)', total: inserted.length });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+    await Thread.insertMany(threads);
+    res.json({ success: true, message: threads.length + '개 데모 스레드 추가 (국내/해외 구분 포함, 삭제된 콘텐츠 1건)', total: threads.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 export default router;
