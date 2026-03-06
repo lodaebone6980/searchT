@@ -36,41 +36,67 @@ export class CollectorEngine {
 
   async collectProfileThreads(profile) {
     let threads = [];
+
     if (this.api && profile.userId) {
+      // Use official API if available
       const raw = await this.api.collectAllThreads(profile.userId, 2);
       threads = raw.map(t => this.api.normalize(t));
     } else {
-      const scraped = await this.scraper.scrapeProfile(profile.username);
-      if (scraped) threads = [scraped];
+      // Use scraper - now returns { profile: {...}, threads: [...] }
+      const result = await this.scraper.scrapeProfileThreads(profile.username);
+
+      // Update profile info from scraper
+      if (result.profile) {
+        if (result.profile.displayName) profile.displayName = result.profile.displayName;
+        if (result.profile.bio) profile.bio = result.profile.bio;
+        if (result.profile.followerCount) profile.followerCount = result.profile.followerCount;
+        if (result.profile.isVerified) profile.isVerified = result.profile.isVerified;
+      }
+
+      threads = result.threads || [];
     }
 
+    let newCount = 0;
     for (const thread of threads) {
-      await this.processThread(thread, profile);
+      const saved = await this.processThread(thread, profile);
+      if (saved) newCount++;
     }
 
     profile.tracking.lastCollectedAt = new Date();
-    profile.tracking.totalCollected += threads.length;
+    profile.tracking.totalCollected += newCount;
     await profile.save();
+    logger.info('Collected ' + newCount + ' new threads for @' + profile.username);
   }
 
   async processThread(threadData, profile) {
+    if (!threadData || !threadData.threadId) return false;
+
     const existing = await Thread.findOne({ threadId: threadData.threadId });
-    if (existing) return;
+    if (existing) return false;
 
     const affiliate = this.affiliateDetector.analyze(threadData);
     const category = await this.classifier.classify(threadData);
 
     const thread = new Thread({
-      ...threadData,
-      author: { username: profile.username, userId: profile.userId, displayName: profile.displayName },
+      threadId: threadData.threadId,
+      content: threadData.content || { text: '', mediaUrls: [], urls: [] },
+      metrics: threadData.metrics || { likes: 0, replies: 0, reposts: 0 },
+      author: {
+        username: profile.username,
+        userId: profile.userId || '',
+        displayName: profile.displayName || profile.username,
+      },
       category,
       affiliate,
+      source: threadData.source || 'scraper',
+      postedAt: threadData.postedAt || new Date(),
       collectedAt: new Date(),
     });
 
     await thread.save();
     this.stats.totalCollected++;
     logger.debug('Saved thread: ' + threadData.threadId);
+    return true;
   }
 
   getStats() { return { ...this.stats, uptime: process.uptime() }; }
