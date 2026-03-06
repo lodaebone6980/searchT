@@ -23,6 +23,7 @@
     "winston": "^3.11.0",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
-    "playwright-core": "^1.45.0"
+    "playwright-core": "^1.45.0",
+    "cheerio": "^1.0.0-rc.12"
   }
 }
