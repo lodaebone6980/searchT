@@ -173,7 +173,7 @@ nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;paddin
     </div>
   </div>
   <div class="nav-right">
-    <button class="btn btn-token" onclick="showTokenModal()">🔑 API 토큰 설정</button>
+    
     <button class="btn btn-collect" id="collectBtn" onclick="runCollect()">✨ 수집하기</button>
     <span class="nav-badge" id="totalBadge">0개 수집됨</span>
     <span class="nav-status" id="lastUpdate"></span>
@@ -268,22 +268,23 @@ nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;paddin
   </div>
 </div>
 
-<div class="token-modal" id="tokenModal">
+<div class="token-modal" id="collectModal">
   <div class="token-dialog">
-    <h3>🔑 Meta Threads API 토큰 설정</h3>
-    <p>Threads Official API에서 실제 데이터를 수집하려면 액세스 토큰이 필요합니다.</p>
-    <p>토큰 발급 방법:<br>1. <a href="https://developers.facebook.com" target="_blank">Meta 개발자 포털</a>에서 앱 생성<br>2. Threads API 권한 추가<br>3. 액세스 토큰 발급</p>
-    <input type="text" id="tokenInput" placeholder="Threads API 액세스 토큰 입력...">
+    <h3>🧵 스레드 수집하기</h3>
+    <p>수집할 Threads 유저명을 입력하세요. 여러 명은 쉼표(,)로 구분합니다.<br>예: zuck, mosseri, threads</p>
+    <input type="text" id="usernameInput" placeholder="유저명 입력 (예: zuck, mosseri)">
+    <p style="font-size:11px;color:#999;margin-top:-8px">ℹ️ 공개 프로필의 스레드를 Playwright로 수집합니다. 무료이며 API 토큰이 필요없습니다.</p>
     <div class="btn-row">
-      <button class="btn btn-cancel" onclick="hideTokenModal()">취소</button>
-      <button class="btn btn-save" onclick="saveToken()">저장</button>
+      <button class="btn btn-cancel" onclick="hideCollectModal()">취소</button>
+      <button class="btn btn-save" onclick="startScrape()">수집 시작</button>
     </div>
+    <div id="scrapeStatus" style="margin-top:12px;font-size:13px;display:none"></div>
   </div>
 </div><script>
 let currentCategory = 'all';
 let currentRegion = 'all';
 let searchTimer = null;
-let savedToken = localStorage.getItem('threads_token') || '';
+
 
 function timeAgo(date) {
   const d = new Date(date);
@@ -331,43 +332,47 @@ function debounceSearch() {
   searchTimer = setTimeout(() => loadThreads(), 300);
 }
 
-function showTokenModal() {
-  document.getElementById('tokenModal').classList.add('show');
-  document.getElementById('tokenInput').value = savedToken;
-}
-function hideTokenModal() { document.getElementById('tokenModal').classList.remove('show'); }
-function saveToken() {
-  savedToken = document.getElementById('tokenInput').value.trim();
-  localStorage.setItem('threads_token', savedToken);
-  hideTokenModal();
-  if (savedToken) alert('API 토큰이 저장되었습니다. 수집하기 버튼을 눌러 실제 데이터를 수집하세요!');
-}
+function showCollectModal() { document.getElementById('collectModal').classList.add('show'); }
+function hideCollectModal() { document.getElementById('collectModal').classList.remove('show'); }
 
-async function runCollect() {
-  const btn = document.getElementById('collectBtn');
-  if (!savedToken) { showTokenModal(); return; }
-  btn.classList.add('loading');
-  btn.innerHTML = '⏳ 수집 중...';
+async function runCollect() { showCollectModal(); }
+
+async function startScrape() {
+  const input = document.getElementById('usernameInput').value.trim();
+  if (!input) { alert('유저명을 입력해주세요.'); return; }
+  const usernames = input.split(',').map(u => u.trim().replace('@','')).filter(Boolean);
+  if (usernames.length === 0) { alert('유저명을 입력해주세요.'); return; }
+  
+  const status = document.getElementById('scrapeStatus');
+  status.style.display = 'block';
+  status.innerHTML = '⏳ ' + usernames.join(', ') + ' 수집 중... (최대 30초 소요)';
+  status.style.color = '#1a1a2e';
+  
   try {
-    const res = await fetch('/api/collector/run', {
+    const res = await fetch('/api/collector/scrape', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accessToken: savedToken })
+      body: JSON.stringify({ usernames })
     });
     const data = await res.json();
     if (data.success) {
-      btn.innerHTML = '✅ ' + data.message;
-      setTimeout(() => { btn.innerHTML = '✨ 수집하기'; btn.classList.remove('loading'); }, 3000);
-      loadAll();
+      status.innerHTML = '✅ ' + data.message;
+      status.style.color = '#10b981';
+      let detail = '';
+      if (data.details) {
+        data.details.forEach(d => {
+          detail += '<br>@' + d.username + ': ' + d.found + '개 발견, ' + d.saved + '개 저장';
+        });
+      }
+      status.innerHTML += detail;
+      setTimeout(() => { hideCollectModal(); loadAll(); }, 3000);
     } else {
-      alert('수집 실패: ' + data.message);
-      btn.innerHTML = '✨ 수집하기';
-      btn.classList.remove('loading');
+      status.innerHTML = '❌ ' + data.message;
+      status.style.color = '#ef4444';
     }
   } catch (e) {
-    alert('오류: ' + e.message);
-    btn.innerHTML = '✨ 수집하기';
-    btn.classList.remove('loading');
+    status.innerHTML = '❌ 오류: ' + e.message;
+    status.style.color = '#ef4444';
   }
 }
 
