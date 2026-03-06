@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SearchT - 쓰레드 수집기</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0a0a1a;color:#e0e0e0;min-height:100vh}
+nav{background:#12122a;padding:12px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #2a2a4a;flex-wrap:wrap}
+nav h1{color:#7c6cff;font-size:20px;margin-right:auto}
+nav button{background:none;border:none;color:#888;padding:8px 16px;cursor:pointer;font-size:14px;border-radius:6px;transition:all .2s}
+nav button:hover{color:#bbb}nav button.active{background:#1a1a3a;color:#7c6cff}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.sc{background:#12122a;border:1px solid #2a2a4a;border-radius:12px;padding:20px;text-align:center}
+.sc .n{font-size:32px;font-weight:bold;color:#7c6cff}.sc .l{font-size:13px;color:#888;margin-top:4px}
+.sec{background:#12122a;border:1px solid #2a2a4a;border-radius:12px;padding:20px;margin-bottom:20px}
+.sec h2{font-size:16px;margin-bottom:16px;color:#ccc}
+.ti{padding:12px;border-bottom:1px solid #1a1a3a}.ti:last-child{border:none}
+.b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold}
+.b.shopping{background:#ff6b3520;color:#ff6b35}.b.issue{background:#3b82f620;color:#3b82f6}.b.personal{background:#10b98120;color:#10b981}
+.fr{display:flex;gap:8px;margin-bottom:12px}
+.fr input,.fr select{background:#0a0a1a;border:1px solid #2a2a4a;color:#e0e0e0;padding:8px 12px;border-radius:6px;flex:1}
+.btn{background:#7c6cff;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px}
+.btn:hover{background:#6b5ce7}.btn.d{background:#ef4444}
+.em{text-align:center;padding:40px;color:#555}
+.pi{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid #1a1a3a}
+.tg{background:#2a2a4a;padding:2px 8px;border-radius:4px;font-size:12px;margin-left:4px}
+</style>
+</head>
+<body>
+<nav>
+<h1>SearchT</h1>
+<span style="color:#555;font-size:12px">쓰레드 수집 플랫폼</span>
+<button class="active" onclick="showTab('dashboard',this)">대시보드</button>
+<button onclick="showTab('shopping',this)">쇼핑</button>
+<button onclick="showTab('issue',this)">이슈</button>
+<button onclick="showTab('personal',this)">퍼스널</button>
+<button onclick="showTab('profiles',this)">프로필관리</button>
+<button onclick="showTab('collector',this)">수집관리</button>
+</nav>
+<div class="container" id="ct"><div class="em">로딩중...</div></div>
+<script>
+var A='/api',T='dashboard';
+function showTab(t,e){T=t;document.querySelectorAll('nav button').forEach(function(b){b.classList.remove('active')});if(e)e.classList.add('active');R()}
+function q(p,o){return fetch(A+p,o).then(function(r){return r.json()}).catch(function(){return{success:false}})}
+function R(){
+var e=document.getElementById('ct');
+e.innerHTML='<div class="em">로딩중...</div>';
+if(T==='dashboard')rD(e);
+else if(T==='shopping'||T==='issue'||T==='personal')rC(e,T);
+else if(T==='profiles')rP(e);
+else if(T==='collector')rL(e);
+}
+function rD(e){
+Promise.all([q('/stats/overview'),q('/stats/trending?hours=24')]).then(function(r){
+var d=r[0].data||{},kw=(r[1].data||[]).slice(0,10);
+e.innerHTML='<div class="stats">'+
+'<div class="sc"><div class="n">'+(d.totalThreads||0)+'</div><div class="l">전체 쓰레드</div></div>'+
+'<div class="sc"><div class="n">'+(d.todayThreads||0)+'</div><div class="l">오늘 수집</div></div>'+
+'<div class="sc"><div class="n">'+(d.totalProfiles||0)+'</div><div class="l">추적 프로필</div></div>'+
+'<div class="sc"><div class="n">'+(d.affiliateCount||0)+'</div><div class="l">제휴링크</div></div></div>'+
+'<div class="sec"><h2>트렌딩 키워드 (24h)</h2>'+
+(kw.length?kw.map(function(k){return'<span class="tg" style="margin:4px;padding:6px 12px;font-size:14px">'+k.keyword+' ('+k.count+')</span>'}).join(''):'<div class="em">아직 데이터가 없습니다. 프로필을 추가하고 수집을 시작하세요.</div>')+'</div>'})
+}
+function rC(e,c){
+var lb={shopping:'쇼핑',issue:'이슈',personal:'퍼스널'};
+q('/threads?category='+c+'&limit=50').then(function(r){
+var ts=r.data||[];
+e.innerHTML='<div class="sec"><h2>'+lb[c]+' ('+ts.length+'건)</h2>'+
+(ts.length?ts.map(function(t){
+return'<div class="ti"><span class="b '+c+'">'+lb[c]+'</span> <strong style="margin-left:8px">@'+(t.author&&t.author.username||'?')+'</strong>'+
+'<p style="margin-top:6px;color:#aaa">'+(t.content&&t.content.text||'').slice(0,200)+'</p>'+
+'<small style="color:#555">'+new Date(t.collectedAt).toLocaleString('ko-KR')+'</small>'+
+(t.affiliate&&t.affiliate.hasAffiliate?' <span class="b" style="background:#ff6b3520;color:#ff6b35">제휴링크</span>':'')+
+'</div>'}).join(''):'<div class="em">수집된 '+lb[c]+' 데이터가 없습니다.</div>')+'</div>'})
+}
+function rP(e){
+q('/profiles?limit=100').then(function(r){
+var ps=r.data||[];
+e.innerHTML='<div class="sec"><h2>프로필 추가</h2>'+
+'<div class="fr"><input id="nu" placeholder="쓰레드 사용자명 (예: zuck)">'+
+'<select id="nc"><option value="shopping">쇼핑</option><option value="issue">이슈</option><option value="personal">퍼스널</option></select>'+
+'<select id="np"><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select>'+
+'<button class="btn" onclick="aP()">추가</button></div></div>'+
+'<div class="sec"><h2>추적 중 ('+ps.length+')</h2>'+
+(ps.length?ps.map(function(p){
+return'<div class="pi"><div><strong>@'+p.username+'</strong>'+
+' <span class="b '+(p.category&&p.category.primary||'')+'">'+(p.category&&p.category.primary||'미분류')+'</span>'+
+' <span class="tg">'+(p.tracking&&p.tracking.priority||'medium')+'</span>'+
+' <small style="color:#555">수집:'+(p.tracking&&p.tracking.totalCollected||0)+'건</small></div>'+
+'<button class="btn d" onclick="dP(\x27'+p._id+'\x27)">중지</button></div>'}).join(''):'<div class="em">추적 중인 프로필이 없습니다.</div>')+'</div>'})
+}
+function rL(e){
+q('/collector/status').then(function(r){
+var s=r.data||{};
+e.innerHTML='<div class="sec"><h2>수집기 상태</h2>'+
+'<div class="stats" style="grid-template-columns:repeat(3,1fr)">'+
+'<div class="sc"><div class="n">'+(s.totalCollected||0)+'</div><div class="l">총 수집</div></div>'+
+'<div class="sc"><div class="n">'+(s.errors||0)+'</div><div class="l">에러</div></div>'+
+'<div class="sc"><div class="n">'+(s.lastRun?new Date(s.lastRun).toLocaleString("ko-KR"):"-")+'</div><div class="l">마지막 수집</div></div></div>'+
+'<div style="margin-top:16px;text-align:center">'+
+'<button class="btn" onclick="rN()" style="padding:12px 40px;font-size:16px">수동 수집 실행</button></div></div>'+
+'<div class="sec"><h2>수집 설정</h2>'+
+'<p style="color:#888">자동 수집: <strong>5분</strong> 간격</p>'+
+'<p style="color:#888;margin-top:8px">배치당 최대: <strong>100</strong> 쓰레드</p></div>'})
+}
+function aP(){
+var u=document.getElementById('nu').value.trim().replace('@','');
+var c=document.getElementById('nc').value;
+var p=document.getElementById('np').value;
+if(!u){alert('사용자명을 입력하세요');return}
+q('/profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,category:c,priority:p})}).then(function(r){
+if(r.success){document.getElementById('nu').value='';R()}else{alert(r.error||'추가 실패')}})
+}
+function dP(id){
+if(!confirm('이 프로필 추적을 중지하시겠습니까?'))return;
+q('/profiles/'+id,{method:'DELETE'}).then(function(){R()})
+}
+function rN(){
+q('/collector/run',{method:'POST'}).then(function(r){
+alert(r.success?'수집이 시작되었습니다!':'수집 실패');
+setTimeout(R,3000)})
+}
+R();
+</script>
+</body>
+</html>
