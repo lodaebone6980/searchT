@@ -10,6 +10,25 @@ function getScraper() {
   return scraper;
 }
 
+// Helper: clean text for region detection (remove Threads UI Korean text)
+function cleanForRegionDetect(text) {
+  return text
+    .replace(/번역하기/g, '')
+    .replace(/좋아요[\d,.만천]*/g, '')
+    .replace(/댓글[\d,.만천]*/g, '')
+    .replace(/리포스트[\d,.만천]*/g, '')
+    .replace(/공유하기[\d,.만천]*/g, '')
+    .replace(/인증된\s*계정/g, '')
+    .replace(/더\s*보기/g, '')
+    .replace(/팔로우/g, '')
+    .replace(/팔로워\s*[\d,.만천]+/g, '')
+    .replace(/답글\s*달기/g, '')
+    .replace(/수정됨/g, '')
+    .replace(/\d+[시일분초]간?\s*전/g, '')
+    .replace(/\d{4}-\d{2}-\d{2}/g, '')
+    .trim();
+}
+
 // ===== Stats =====
 router.get('/stats', async (req, res) => {
   try {
@@ -96,8 +115,14 @@ router.post('/collector/scrape', async (req, res) => {
         const hashtags = text.match(/#[\w\uAC00-\uD7A3]+/g) || [];
         const mentions = text.match(/@[\w.]+/g) || [];
         const urls = text.match(/https?:\/\/[^\s]+/g) || [];
-        
-        const isKorean = /[\uAC00-\uD7A3]/.test(text);
+
+        // Region detection: clean text first to remove Threads UI Korean
+        const cleanedForRegion = cleanForRegionDetect(text);
+        const koreanCharCount = (cleanedForRegion.match(/[\uAC00-\uD7A3]/g) || []).length;
+        const totalCharCount = cleanedForRegion.replace(/\s/g, '').length;
+        // Consider Korean if >10% of chars are Korean (avoids false positives from UI remnants)
+        const isKorean = totalCharCount > 0 && (koreanCharCount / totalCharCount) > 0.1;
+
         const hasAli = urls.some(u => /ali/i.test(u));
         const hasCoupang = urls.some(u => /coupang/i.test(u));
         const hasAmazon = urls.some(u => /amzn|amazon/i.test(u));
@@ -111,7 +136,7 @@ router.post('/collector/scrape', async (req, res) => {
         if (hasRakuten) affLinks.push({ url: urls.find(u => /rakuten/i.test(u)), platform: 'rakuten', detectedIn: 'content' });
 
         let catPrimary = 'personal';
-        if (hasAffiliate || /(할인|쿠폰|링크|세일|최저가|배송|리뷰|추천|구매)/i.test(text)) catPrimary = 'shopping';
+        if (hasAffiliate || /(할인|쿠폰|맥딜|세일|최저가|배송|리뷰|추천|구매)/i.test(text)) catPrimary = 'shopping';
         else if (/(속보|논란|규제|선거|정치|경제|사회|사건|이슈|국회|법안)/i.test(text)) catPrimary = 'issue';
 
         const mediaType = t.mediaType === 'video' ? 'video' : t.mediaType === 'carousel' ? 'carousel' : t.imageUrl ? 'image' : 'text';
@@ -159,8 +184,8 @@ router.post('/collector/scrape', async (req, res) => {
       results.push({ username: clean, found: data.threads.length, saved });
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: totalSaved + '개 스레드 수집 완료',
       total: totalSaved,
       details: results
@@ -178,7 +203,7 @@ router.post('/seed-demo', async (req, res) => {
     const now = new Date();
     const ago = (m) => new Date(now - m * 60000);
     const threads = [
-      { threadId: 'demo_kr_shop_1', author: { username: 'coupang_picks', displayName: '쿠팡추천마니아', profilePicUrl: 'https://picsum.photos/seed/cp1/100', followerCount: 45000, isVerified: true }, content: { text: '🎁 쿠팡 로켓배송 오늘의 핵딜 TOP5 #쿠팡 #핵딜 #로켓배송', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/shop1/600/400','https://picsum.photos/seed/shop1b/600/400'], thumbnailUrl: 'https://picsum.photos/seed/shop1/600/400', urls: ['https://link.coupang.com/xyz789'], hashtags: ['#쿠팡','#핵딜'] }, category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.95, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/xyz789', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 1890, replies: 312, reposts: 445, engagementRate: 88 }, analysis: { sentiment: 'positive', keywords: ['쿠팡','핵딜'], language: 'ko' }, publishedAt: ago(120), source: 'scraper' },
+      { threadId: 'demo_kr_shop_1', author: { username: 'coupang_picks', displayName: '쿠팡추천마니아', profilePicUrl: 'https://picsum.photos/seed/cp1/100', followerCount: 45000, isVerified: true }, content: { text: '🎁 쿠팡 로켓배송 오늘의 핫딜 TOP5 #쿠팡 #핫딜 #로켓배송', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/shop1/600/400','https://picsum.photos/seed/shop1b/600/400'], thumbnailUrl: 'https://picsum.photos/seed/shop1/600/400', urls: ['https://link.coupang.com/xyz789'], hashtags: ['#쿠팡','#핫딜'] }, category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.95, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/xyz789', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 1890, replies: 312, reposts: 445, engagementRate: 88 }, analysis: { sentiment: 'positive', keywords: ['쿠팡','핫딜'], language: 'ko' }, publishedAt: ago(120), source: 'scraper' },
       { threadId: 'demo_kr_shop_2', author: { username: 'beauty_haul_kr', displayName: '뷰티하울', profilePicUrl: 'https://picsum.photos/seed/bh1/100', followerCount: 23000 }, content: { text: '💄 올리브영 립오일 50% 할인! #올리브영 #뷰티딜', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/beauty1/600/400', videoUrl: 'https://example.com/v1.mp4', urls: ['https://link.coupang.com/beauty01'], hashtags: ['#올리브영'] }, category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.92, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/beauty01', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 3400, replies: 567, reposts: 234, engagementRate: 91 }, analysis: { sentiment: 'positive', keywords: ['올리브영','할인'], language: 'ko' }, publishedAt: ago(90), source: 'scraper' },
       { threadId: 'demo_os_shop_1', author: { username: 'deal_hunter_kr', displayName: '딜헌터KR', profilePicUrl: 'https://picsum.photos/seed/dh1/100', followerCount: 18000 }, content: { text: '🔥 알리 역대급 할인! 에어팟맥스 케이스 $2.99 #알리익스프레스 #할인', mediaType: 'image', thumbnailUrl: 'https://picsum.photos/seed/ali1/600/400', urls: ['https://ali.ski/abc123'], hashtags: ['#알리익스프레스'] }, category: { primary: 'shopping', sub: 'AliExpress', confidence: 0.95, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: true, links: [{ url: 'https://ali.ski/abc123', platform: 'aliexpress', detectedIn: 'content' }] }, metrics: { likes: 2340, replies: 189, reposts: 567, engagementRate: 94 }, analysis: { sentiment: 'positive', keywords: ['알리','할인'], language: 'ko' }, publishedAt: ago(60), source: 'scraper' },
       { threadId: 'demo_os_shop_2', author: { username: 'us_deal_master', displayName: '미국직구마스터', profilePicUrl: 'https://picsum.photos/seed/us1/100', followerCount: 32000, isVerified: true }, content: { text: '🇺🇸 아마존 프라임데이 사전할인! 갤럭시 버즈3 프로 최저가 #아마존 #프라임데이', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/amz1/600/400', videoUrl: 'https://example.com/v2.mp4', urls: ['https://amzn.to/def456'], hashtags: ['#아마존'] }, category: { primary: 'shopping', sub: 'Amazon', confidence: 0.96, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: true, links: [{ url: 'https://amzn.to/def456', platform: 'amazon', detectedIn: 'content' }] }, metrics: { likes: 3210, replies: 456, reposts: 789, engagementRate: 97 }, analysis: { sentiment: 'positive', keywords: ['아마존','프라임데이'], language: 'ko' }, publishedAt: ago(180), source: 'scraper' },
@@ -186,7 +211,7 @@ router.post('/seed-demo', async (req, res) => {
       { threadId: 'demo_kr_issue_2', author: { username: 'politics_watch', displayName: '정치워치', profilePicUrl: 'https://picsum.photos/seed/pol1/100', followerCount: 67000, isVerified: true }, content: { text: '🏛️ 국회 AI 규제법안 본회의 통과 #AI규제 #국회', mediaType: 'text', hashtags: ['#AI규제'] }, category: { primary: 'issue', sub: '시사', confidence: 0.94, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 8900, replies: 2340, reposts: 3400, engagementRate: 85 }, analysis: { sentiment: 'neutral', keywords: ['AI규제','국회'], language: 'ko' }, publishedAt: ago(100), source: 'scraper' },
       { threadId: 'demo_kr_issue_3', author: { username: 'sports_flash', displayName: '스포츠플래시', profilePicUrl: 'https://picsum.photos/seed/sp1/100', followerCount: 89000, isVerified: true }, content: { text: '⚽ 손흥민 시즌 20호골! EPL 득점왕 경쟁 본격화 #손흥민 #EPL', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/son1/600/400', videoUrl: 'https://example.com/son.mp4', hashtags: ['#손흥민','#EPL'] }, category: { primary: 'issue', sub: '스포츠', confidence: 0.96, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 34500, replies: 5600, reposts: 8900, engagementRate: 96 }, analysis: { sentiment: 'positive', keywords: ['손흥민','EPL'], language: 'ko' }, publishedAt: ago(30), source: 'scraper' },
       { threadId: 'demo_os_issue_1', author: { username: 'tech_insider_kr', displayName: '테크인사이더', profilePicUrl: 'https://picsum.photos/seed/tech1/100', followerCount: 95000, isVerified: true }, content: { text: '💻 OpenAI GPT-5 출시 임박설 #OpenAI #GPT5 #AI', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/gpt1/600/400', videoUrl: 'https://example.com/gpt5.mp4', hashtags: ['#OpenAI','#GPT5','#AI'] }, category: { primary: 'issue', sub: 'IT/테크', confidence: 0.95, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 12400, replies: 3200, reposts: 5600, engagementRate: 92 }, analysis: { sentiment: 'positive', keywords: ['OpenAI','GPT5','AI'], language: 'ko' }, publishedAt: ago(200), source: 'scraper' },
-      { threadId: 'demo_kr_personal_1', author: { username: 'growth_hacker_jin', displayName: '그로스해커진', profilePicUrl: 'https://picsum.photos/seed/gh1/100', followerCount: 28000 }, content: { text: '🚀 스레드 알고리즘 분석! 도달율 300% 올리는 5가지 팁 #마케팅 #스레드', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/mk1/600/400','https://picsum.photos/seed/mk2/600/400'], thumbnailUrl: 'https://picsum.photos/seed/mk1/600/400', hashtags: ['#마케팅','#스레드'] }, category: { primary: 'personal', sub: '마케팅', confidence: 0.91, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 6700, replies: 890, reposts: 2300, engagementRate: 91 }, analysis: { sentiment: 'positive', keywords: ['스레드','알고리즘'], language: 'ko' }, publishedAt: ago(35), source: 'scraper' },
+      { threadId: 'demo_kr_personal_1', author: { username: 'growth_hacker_jin', displayName: '그로스해커진', profilePicUrl: 'https://picsum.photos/seed/gh1/100', followerCount: 28000 }, content: { text: '🚀 스레드 알고리즘 분석! 도달률 300% 올리는 5가지 팁 #마케팅 #스레드', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/mk1/600/400','https://picsum.photos/seed/mk2/600/400'], thumbnailUrl: 'https://picsum.photos/seed/mk1/600/400', hashtags: ['#마케팅','#스레드'] }, category: { primary: 'personal', sub: '마케팅', confidence: 0.91, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 6700, replies: 890, reposts: 2300, engagementRate: 91 }, analysis: { sentiment: 'positive', keywords: ['스레드','알고리즘'], language: 'ko' }, publishedAt: ago(35), source: 'scraper' },
       { threadId: 'demo_os_personal_1', author: { username: 'warren_kr', displayName: '한국의워렌', profilePicUrl: 'https://picsum.photos/seed/wr1/100', followerCount: 41000 }, content: { text: '📈 2026년 포트폴리오 리밸런싱 전략 #투자 #포트폴리오 #반도체', mediaType: 'image', thumbnailUrl: 'https://picsum.photos/seed/inv1/600/400', hashtags: ['#투자','#반도체'] }, category: { primary: 'personal', sub: '투자', confidence: 0.88, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 9800, replies: 1560, reposts: 3400, engagementRate: 89 }, analysis: { sentiment: 'neutral', keywords: ['투자','반도체'], language: 'ko' }, publishedAt: ago(170), source: 'scraper' },
       { threadId: 'demo_deleted_1', author: { username: 'deleted_user123', displayName: '삭제된유저' }, content: { text: '삭제된 게시물. 원본: 쿠팡 할인코드 공유 #할인코드', mediaType: 'text', urls: ['https://link.coupang.com/del001'], hashtags: ['#할인코드'] }, category: { primary: 'shopping', sub: '쿠팡', confidence: 0.8, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/del001', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 340, replies: 23, reposts: 12, engagementRate: 45 }, analysis: { sentiment: 'positive', keywords: ['쿠팡'], language: 'ko' }, deletion: { isDeleted: true, deletedAt: ago(30), detectedAt: ago(25), reason: 'user_deleted' }, publishedAt: ago(300), source: 'scraper' },
     ];
