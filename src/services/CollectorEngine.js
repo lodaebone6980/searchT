@@ -61,7 +61,7 @@ class CollectorEngine {
         for (const keyword of keywords) {
           try {
             this.logEvent(`Searching keyword: ${keyword}`, 'info');
-            const threadUrls = await this.scraper.searchThreads(keyword);
+            const threadUrls = await this.scraper.scrapeKeywords(keyword);
 
             for (const url of threadUrls) {
               try {
@@ -127,7 +127,7 @@ class CollectorEngine {
       for (const username of usernames) {
         try {
           this.logEvent(`Scraping profile: ${username}`, 'info');
-          const threadUrls = await this.scraper.scrapeProfileThreads(username);
+          const threadUrls = await this.scraper.scrapeProfile(username);
 
           for (const url of threadUrls) {
             try {
@@ -170,7 +170,7 @@ class CollectorEngine {
       for (const username of usernames) {
         try {
           this.logEvent(`Manual collection from: ${username}`, 'info');
-          const threadUrls = await this.scraper.scrapeProfileThreads(username);
+          const threadUrls = await this.scraper.scrapeProfile(username);
 
           for (const url of threadUrls) {
             try {
@@ -489,7 +489,7 @@ class CollectorEngine {
    */
   resetStats() {
     this.stats = {
-      totalCollected:  0,
+      totalCollected: 0,
       totalKeyword: 0,
       totalProfile: 0,
       totalAffiliate: 0,
