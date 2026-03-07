@@ -20,16 +20,16 @@ class CollectorEngine {
 
     // Discovery keywords grouped by category
     this.discoveryKeywords = {
-      shopping: ['ì¿ í¡ í ì¸', 'í«ë ì¶ì²', 'ìë¦¬ í ì¸', 'ìë§ì¡´ ì§êµ¬', 'ì¼í ì¶ì²', 'ë§í¬ í ì¸'],
-      issue: ['ìë³´', 'ë¼ë', 'íì  ì¤ìê°', 'ì´ì ì ë¦¬', 'breaking news'],
-      personal: ['í ê³µì ', 'ë¸íì°', 'í¬í¸í´ë¦¬ì¤ ê³µê°']
+      shopping: ['Ã¬Â¿Â Ã­ÂÂ¡ Ã­ÂÂ Ã¬ÂÂ¸', 'Ã­ÂÂ«Ã«ÂÂ Ã¬Â¶ÂÃ¬Â²Â', 'Ã¬ÂÂÃ«Â¦Â¬ Ã­ÂÂ Ã¬ÂÂ¸', 'Ã¬ÂÂÃ«Â§ÂÃ¬Â¡Â´ Ã¬Â§ÂÃªÂµÂ¬', 'Ã¬ÂÂ¼Ã­ÂÂ Ã¬Â¶ÂÃ¬Â²Â', 'Ã«Â§ÂÃ­ÂÂ¬ Ã­ÂÂ Ã¬ÂÂ¸'],
+      issue: ['Ã¬ÂÂÃ«Â³Â´', 'Ã«ÂÂ¼Ã«ÂÂ', 'Ã­ÂÂÃ¬Â Â Ã¬ÂÂ¤Ã¬ÂÂÃªÂ°Â', 'Ã¬ÂÂ´Ã¬ÂÂ Ã¬Â ÂÃ«Â¦Â¬', 'breaking news'],
+      personal: ['Ã­ÂÂ ÃªÂ³ÂµÃ¬ÂÂ ', 'Ã«ÂÂ¸Ã­ÂÂÃ¬ÂÂ°', 'Ã­ÂÂ¬Ã­ÂÂ¸Ã­ÂÂ´Ã«Â¦Â¬Ã¬ÂÂ¤ ÃªÂ³ÂµÃªÂ°Â']
     };
 
     // Category keywords for classification
     this.categoryKeywords = {
-      shopping: ['í ì¸', 'ì¿ í°', 'í«ë', 'ì¸ì¼', 'ìµì ê°', 'ì¶ì²í', 'ë¦¬ë·°', 'êµ¬ë§¤', 'ë°°ì¡', 'ì§êµ¬', 'ê°ì±ë¹', 'ì¸ë°ì±'],
-      issue: ['ìë³´', 'ë¼ë', 'ê¸´ê¸', 'íì ', 'ì´ì', 'ë´ì¤', 'ê·ì ', 'ì ê±°', 'ì ì¹', 'ê²½ì ', 'ì¬ê±´'],
-      personal: ['í', 'ë¸íì°', 'ë°©ë²', 'ì ëµ', 'ê²½í', 'í¬í¸í´ë¦¬ì¤', 'ê°ì', 'ê°ì´ë']
+      shopping: ['Ã­ÂÂ Ã¬ÂÂ¸', 'Ã¬Â¿Â Ã­ÂÂ°', 'Ã­ÂÂ«Ã«ÂÂ', 'Ã¬ÂÂ¸Ã¬ÂÂ¼', 'Ã¬ÂµÂÃ¬Â ÂÃªÂ°Â', 'Ã¬Â¶ÂÃ¬Â²ÂÃ­ÂÂ', 'Ã«Â¦Â¬Ã«Â·Â°', 'ÃªÂµÂ¬Ã«Â§Â¤', 'Ã«Â°Â°Ã¬ÂÂ¡', 'Ã¬Â§ÂÃªÂµÂ¬', 'ÃªÂ°ÂÃ¬ÂÂ±Ã«Â¹Â', 'Ã¬ÂÂ¸Ã«Â°ÂÃ¬ÂÂ±'],
+      issue: ['Ã¬ÂÂÃ«Â³Â´', 'Ã«ÂÂ¼Ã«ÂÂ', 'ÃªÂ¸Â´ÃªÂ¸Â', 'Ã­ÂÂÃ¬Â Â', 'Ã¬ÂÂ´Ã¬ÂÂ', 'Ã«ÂÂ´Ã¬ÂÂ¤', 'ÃªÂ·ÂÃ¬Â Â', 'Ã¬ÂÂ ÃªÂ±Â°', 'Ã¬Â ÂÃ¬Â¹Â', 'ÃªÂ²Â½Ã¬Â Â', 'Ã¬ÂÂ¬ÃªÂ±Â´'],
+      personal: ['Ã­ÂÂ', 'Ã«ÂÂ¸Ã­ÂÂÃ¬ÂÂ°', 'Ã«Â°Â©Ã«Â²Â', 'Ã¬Â ÂÃ«ÂÂµ', 'ÃªÂ²Â½Ã­ÂÂ', 'Ã­ÂÂ¬Ã­ÂÂ¸Ã­ÂÂ´Ã«Â¦Â¬Ã¬ÂÂ¤', 'ÃªÂ°ÂÃ¬ÂÂ', 'ÃªÂ°ÂÃ¬ÂÂ´Ã«ÂÂ']
     };
 
     // Affiliate patterns
@@ -42,7 +42,7 @@ class CollectorEngine {
   }
 
   /**
-   * Full auto collection cycle: keyword search â profile scrape â save to DB
+   * Full auto collection cycle: keyword search Ã¢ÂÂ profile scrape Ã¢ÂÂ save to DB
    */
   async runAutoCollection() {
     if (this.isRunning) {
@@ -67,7 +67,8 @@ class CollectorEngine {
           for (const url of threadUrls) {
             try {
               const threadData = await this.scraper.scrapeThreadDetail(url);
-              const comments = await this.scraper.scrapeComments(url);
+              const _cmtResult = await this.scraper.scrapeComments(url);
+            const comments = Array.isArray(_cmtResult) ? _cmtResult : (_cmtResult && _cmtResult.comments ? _cmtResult.comments : []);
               await this.processAndSaveThread(threadData, 'auto_keyword', null, comments);
               this.stats.totalKeyword++;
             } catch (error) {
@@ -137,7 +138,8 @@ class CollectorEngine {
           for (const url of threadUrls) {
             try {
               const threadData = await this.scraper.scrapeThreadDetail(url);
-              const comments = await this.scraper.scrapeComments(url);
+              const _cmtResult2 = await this.scraper.scrapeComments(url);
+            const comments = Array.isArray(_cmtResult2) ? _cmtResult2 : (_cmtResult2 && _cmtResult2.comments ? _cmtResult2.comments : []);
               await this.processAndSaveThread(threadData, 'auto_profile', username, comments);
               collectedCount.success++;
               this.stats.totalProfile++;
@@ -181,7 +183,8 @@ class CollectorEngine {
           for (const url of threadUrls) {
             try {
               const threadData = await this.scraper.scrapeThreadDetail(url);
-              const comments = await this.scraper.scrapeComments(url);
+              const _cmtResult3 = await this.scraper.scrapeComments(url);
+            const comments = Array.isArray(_cmtResult3) ? _cmtResult3 : (_cmtResult3 && _cmtResult3.comments ? _cmtResult3.comments : []);
               await this.processAndSaveThread(threadData, 'manual', username, comments);
               collectedCount.success++;
               this.stats.totalCollected++;
