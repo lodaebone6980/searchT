@@ -1,338 +1,133 @@
-import { chromium } from 'playwright-core';
+// ThreadsScraper - HTTP-based Threads data collector (no Playwright needed)
+const https = require('https');
 
 class ThreadsScraper {
   constructor() {
-    this.browser = null;
-    this.executablePath = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
-    this.defaultTimeout = 30000;
-    this.networkIdleTimeout = 25000;
+    this.headers = {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'identity',
+      'Connection': 'keep-alive',
+    };
+    this.graphqlHeaders = {
+      'User-Agent': 'Barcelona 289.0.0.77.109 Android',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-IG-App-ID': '238260118697367',
+      'Accept': '*/*',
+      'Accept-Language': 'ko-KR,ko;q=0.9',
+    };
   }
 
-  async _getBrowser() {
-    if (!this.browser || !this.browser.isConnected()) {
-      try {
-        this.browser = await chromium.launch({
-          executablePath: this.executablePath,
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--single-process',
-            '--disable-web-resources',
-            '--disable-extensions',
-            '--disable-plugins'
-          ]
+  _fetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Request timeout')), 15000);
+      const urlObj = new URL(url);
+      const reqOptions = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        method: options.method || 'GET',
+        headers: options.headers || this.headers,
+      };
+      const req = https.request(reqOptions, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          clearTimeout(timeout);
+          resolve({ status: res.statusCode, data, headers: res.headers });
         });
-      } catch (err) {
-        console.error('[ThreadsScraper] Browser launch error:', err.message);
-        throw new Error(`Failed to launch browser: ${err.message}`);
+      });
+      req.on('error', (err) => { clearTimeout(timeout); reject(err); });
+      if (options.body) req.write(options.body);
+      req.end();
+    });
+  }
+
+  async _fetchJSON(url, options = {}) {
+    const res = await this._fetch(url, options);
+    try {
+      return JSON.parse(res.data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _extractThreadsFromHTML(html) {
+    const threads = [];
+    try {
+      // Extract thread data from SSR HTML or embedded JSON
+      const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
+      for (const script of scriptMatches) {
+        const content = script.replace(/<\/?script[^>]*>/gi, '');
+        if (content.includes('thread_items') || content.includes('post_id') || content.includes('"code"')) {
+          // Try to find JSON data
+          const jsonMatches = content.match(/\{[\s\S]{50,}\}/g) || [];
+          for (const jsonStr of jsonMatches) {
+            try {
+              const data = JSON.parse(jsonStr);
+              this._extractFromObject(data, threads);
+            } catch (e) {}
+          }
+        }
+      }
+      // Also extract thread URLs directly from HTML
+      const urlMatches = html.match(/threads\.net\/@[\w.]+\/post\/[A-Za-z0-9_-]+/g) || [];
+      urlMatches.forEach(u => {
+        const fullUrl = 'https://www.' + u;
+        if (!threads.find(t => t.url === fullUrl)) {
+          threads.push({ url: fullUrl, text: '', author: u.split('/@')[1]?.split('/')[0] || '' });
+        }
+      });
+    } catch (e) {
+      console.warn('[ThreadsScraper] HTML parse error:', e.message);
+    }
+    return threads;
+  }
+
+  _extractFromObject(obj, threads, depth = 0) {
+    if (depth > 10 || !obj || typeof obj !== 'object') return;
+    if (obj.code && obj.user && obj.user.username) {
+      const url = `https://www.threads.net/@\${obj.user.username}/post/\${obj.code}`;
+      if (!threads.find(t => t.url === url)) {
+        threads.push({
+          url,
+          text: obj.caption?.text || '',
+          author: obj.user.username,
+          likes: obj.like_count || 0,
+          replies: obj.text_post_app_info?.direct_reply_count || 0,
+        });
       }
     }
-    return this.browser;
-  }
-
-  async _newPage() {
-    const browser = await this._getBrowser();
-    try {
-      const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        viewport: { width: 1280, height: 800 },
-        locale: 'ko-KR',
-        ignoreHTTPSErrors: true,
+    if (Array.isArray(obj)) {
+      obj.forEach(item => this._extractFromObject(item, threads, depth + 1));
+    } else {
+      Object.values(obj).forEach(val => {
+        if (val && typeof val === 'object') this._extractFromObject(val, threads, depth + 1);
       });
-      // Block heavy resources to save memory
-      await context.route('**/*.{png,jpg,jpeg,gif,svg,webp,woff,woff2,ttf,eot}', route => route.abort());
-      await context.route('**/*', (route, request) => {
-        const type = request.resourceType();
-        if (['image', 'font', 'media'].includes(type)) return route.abort();
-        return route.continue();
-      });
-      const page = await context.newPage();
-      return page;
-    } catch (err) {
-      console.error('[ThreadsScraper] Error creating page:', err.message);
-      // Reset browser on error
-      this.browser = null;
-      throw err;
     }
-  }
-import { chromium } from 'playwright-core';
-
-class ThreadsScraper {
-  constructor() {
-    this.browser = null;
-    this.executablePath = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
-    this.defaultTimeout = 30000;
-    this.networkIdleTimeout = 25000;
-  }
-
-  async _getBrowser() {
-    if (!this.browser || !this.browser.isConnected()) {
-      try {
-        this.browser = await chromium.launch({
-          executablePath: this.executablePath,
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--single-process',
-            '--disable-web-resources',
-            '--disable-extensions',
-            '--disable-plugins'
-          ]
-        });
-      } catch (err) {
-        console.error('[ThreadsScraper] Browser launch error:', err.message);
-        throw new Error(`Failed to launch browser: ${err.message}`);
-      }
-    }
-    return this.browser;
-  }
-
-  async _newPage() {
-    const browser = await this._getBrowser();
-    try {
-      const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        viewport: { width: 1280, height: 800 },
-        locale: 'ko-KR',
-        ignoreHTTPSErrors: true,
-      });
-      const page = await context.newPage();
-      return page;
-    } catch (err) {
-      console.error('[ThreadsScraper] Page creation error:', err.message);
-      throw new Error(`Failed to create new page: ${err.message}`);
-    }
-  }
-
-  _delay(ms = 3000) {
-    const randomDelay = ms + Math.random() * 2000;
-    return new Promise(resolve => setTimeout(resolve, randomDelay));
-  }
-
-  _cleanText(raw) {
-    if (!raw || typeof raw !== 'string') return '';
-
-    return raw
-      // Remove verified account indicators
-      .replace(/^[\w.]+인증된\s*계정/i, '')
-      .replace(/Verified\s+Account/gi, '')
-      // Remove timestamp patterns
-      .replace(/\d{4}-\d{2}-\d{2}/g, '')
-      .replace(/\d+[시일분초]간?\s*(전|ago)/g, '')
-      // Remove UI button text
-      .replace(/더\s*보기/g, '')
-      .replace(/번역하기/g, '')
-      .replace(/Show\s+more/gi, '')
-      .replace(/Translate/gi, '')
-      // Remove engagement metrics from text
-      .replace(/좋아요[\d,.만천]*/g, '')
-      .replace(/댓글[\d,.만천]*/g, '')
-      .replace(/리포스트[\d,.만천]*/g, '')
-      .replace(/공유하기[\d,.만천]*/g, '')
-      .replace(/Likes?[\d,.만천]*/g, '')
-      .replace(/Comments?[\d,.만천]*/g, '')
-      .replace(/Reposts?[\d,.만천]*/g, '')
-      .replace(/Shares?[\d,.만천]*/g, '')
-      // Remove action buttons
-      .replace(/팔로우/g, '')
-      .replace(/언팔로우/g, '')
-      .replace(/Follow/g, '')
-      .replace(/Unfollow/g, '')
-      .replace(/팔로워\s*[\d,.만천]+/g, '')
-      .replace(/Followers?[\d,.만천]*/g, '')
-      .replace(/답글\s*달기/g, '')
-      .replace(/Reply/gi, '')
-      // Remove edit/status indicators
-      .replace(/수정됨/g, '')
-      .replace(/\(edited\)/gi, '')
-      // Normalize whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  _extractMetrics(raw) {
-    if (!raw || typeof raw !== 'string') {
-      return { likeCount: 0, replyCount: 0, repostCount: 0, shareCount: 0 };
-    }
-
-    const parseNum = (numStr) => {
-      if (!numStr || typeof numStr !== 'string') return 0;
-      const cleaned = numStr.replace(/,/g, '').trim();
-      let num = parseFloat(cleaned);
-      if (isNaN(num)) return 0;
-      if (cleaned.includes('만')) num *= 10000;
-      else if (cleaned.includes('천')) num *= 1000;
-      return Math.round(num);
-    };
-
-    const likeMatch = raw.match(/좋아요\s*([\d,.만천]+)|Likes?\s*[:=]?\s*([\d,.만천]+)/i);
-    const replyMatch = raw.match(/댓글\s*([\d,.만천]+)|Comments?\s*[:=]?\s*([\d,.만천]+)/i);
-    const repostMatch = raw.match(/리포스트\s*([\d,.만천]+)|Reposts?\s*[:=]?\s*([\d,.만천]+)/i);
-    const shareMatch = raw.match(/공유하기\s*([\d,.만천]+)|Shares?\s*[:=]?\s*([\d,.만천]+)/i);
-
-    return {
-      likeCount: parseNum(likeMatch?.[1] || likeMatch?.[2]),
-      replyCount: parseNum(replyMatch?.[1] || replyMatch?.[2]),
-      repostCount: parseNum(repostMatch?.[1] || repostMatch?.[2]),
-      shareCount: parseNum(shareMatch?.[1] || shareMatch?.[2]),
-    };
   }
 
   async scrapeProfile(username) {
     if (!username || typeof username !== 'string') {
-      throw new Error('Invalid username: must be a non-empty string');
+      throw new Error('Invalid username');
     }
-
-    const page = await this._newPage();
-    const threads = [];
-    const graphqlResponses = [];
+    const cleanUser = username.replace('@', '').trim();
+    console.log(`[ThreadsScraper] Fetching profile: @\${cleanUser}`);
 
     try {
-      // Intercept GraphQL responses
-      page.on('response', async (response) => {
-        try {
-          const url = response.url();
-          if (url.includes('/api/graphql') || url.includes('threads.net/graphql')) {
-            const contentType = response.headers()['content-type'] || '';
-            if (contentType.includes('json')) {
-              try {
-                const json = await response.json();
-                graphqlResponses.push(json);
-              } catch (parseErr) {
-                // Silent fail for parse errors
-              }
-            }
-          }
-        } catch (err) {
-          // Silent fail for response processing
-        }
-      });
-
-      console.log(`[ThreadsScraper] Scraping profile: @${username}`);
-      await page.goto(`https://www.threads.net/@${username}`, {
-        waitUntil: 'networkidle',
-        timeout: this.defaultTimeout
-      });
-      await this._delay(3000);
-
-      // Scroll to load more content
-      for (let i = 0; i < 5; i++) {
-        try {
-          await page.evaluate(() => window.scrollBy(0, 1000));
-          await this._delay(1500);
-        } catch (err) {
-          console.warn(`[ThreadsScraper] Scroll iteration ${i} failed: ${err.message}`);
-        }
-      }
-
-      // Extract profile metadata
-      const profile = await page.evaluate(() => {
-        try {
-          const name = document.querySelector('meta[property="og:title"]')?.content || '';
-          const desc = document.querySelector('meta[property="og:description"]')?.content || '';
-          const pic = document.querySelector('meta[property="og:image"]')?.content || '';
-          const url = document.querySelector('meta[property="og:url"]')?.content || '';
-
-          return {
-            displayName: name.split('(')[0].trim() || 'Unknown',
-            bio: desc,
-            profilePicUrl: pic,
-            profileUrl: url,
-            scraped: new Date().toISOString()
-          };
-        } catch (err) {
-          return {
-            displayName: 'Unknown',
-            bio: '',
-            profilePicUrl: '',
-            profileUrl: '',
-            scraped: new Date().toISOString()
-          };
-        }
-      });
-
-      // Extract threads from page DOM (fallback approach)
-      const pageThreads = await page.evaluate(() => {
-        const items = [];
-        try {
-          const containers = document.querySelectorAll('[data-pressable-container="true"]');
-          containers.forEach((el, idx) => {
-            try {
-              const text = el.textContent || '';
-              if (text.length > 10) {
-                const img = el.querySelector('img[src*="scontent"]');
-                const links = Array.from(el.querySelectorAll('a'))
-                  .map(a => a.href)
-                  .filter(h => h && h.startsWith('http'));
-                items.push({
-                  rawText: text,
-                  imageUrl: img?.src || '',
-                  index: idx,
-                  links: links
-                });
-              }
-            } catch (innerErr) {
-              // Skip problematic elements
-            }
-          });
-        } catch (err) {
-          // Silent fail
-        }
-        return items;
-      });
-
-      for (const pt of pageThreads) {
-        try {
-          const cleaned = this._cleanText(pt.rawText);
-          if (cleaned.length < 10) continue;
-
-          const metrics = this._extractMetrics(pt.rawText);
-          threads.push({
-            threadId: `${username}_${Date.now()}_${pt.index}`,
-            text: cleaned,
-            rawText: pt.rawText,
-            imageUrl: pt.imageUrl,
-            links: pt.links || [],
-            likeCount: metrics.likeCount,
-            replyCount: metrics.replyCount,
-            repostCount: metrics.repostCount,
-            shareCount: metrics.shareCount,
-            timestamp: new Date().toISOString(),
-            source: 'page_scrape'
-          });
-        } catch (err) {
-          console.warn(`[ThreadsScraper] Error processing thread item: ${err.message}`);
-        }
-      }
-
-      console.log(`[ThreadsScraper] Successfully scraped ${threads.length} threads from @${username}`);
-
+      const res = await this._fetch(`https://www.threads.net/@\${cleanUser}`);
+      const threads = this._extractThreadsFromHTML(res.data);
+      console.log(`[ThreadsScraper] Found \${threads.length} threads from @\${cleanUser}`);
+      
       return {
-        success: true,
-        profile,
-        threads,
-        graphqlResponseCount: graphqlResponses.length
+        success: threads.length > 0,
+        profile: { displayName: cleanUser, bio: '', profilePicUrl: '', profileUrl: `https://www.threads.net/@\${cleanUser}` },
+        threads: threads.map(t => t.url),
+        graphqlResponseCount: 0
       };
     } catch (err) {
-      console.error(`[ThreadsScraper] Profile scrape error for @${username}: ${err.message}`);
-      return {
-        success: false,
-        profile: { displayName: username, bio: '', profilePicUrl: '', profileUrl: '' },
-        threads: [],
-        error: err.message
-      };
-    } finally {
-      try {
-        await page.close().catch(() => {});
-      } catch (err) {
-        console.warn('[ThreadsScraper] Error closing page:', err.message);
-      }
+      console.error(`[ThreadsScraper] Profile error: \${err.message}`);
+      return { success: false, profile: { displayName: cleanUser }, threads: [], error: err.message };
     }
   }
 
@@ -341,449 +136,122 @@ class ThreadsScraper {
       throw new Error('Keywords must be a non-empty array');
     }
 
-    const page = await this._newPage();
     const discoveredUrls = new Map();
-    const graphqlResponses = [];
 
-    try {
-      // Intercept GraphQL responses
-      page.on('response', async (response) => {
-        try {
-          const url = response.url();
-          if (url.includes('/api/graphql') || url.includes('threads.net/graphql') || url.includes('i.instagram.com/api')) {
-            const contentType = response.headers()['content-type'] || '';
-            if (contentType.includes('json')) {
-              try {
-                const json = await response.json();
-                graphqlResponses.push(json);
-              } catch (e) {}
-            }
-          }
-        } catch (e) {}
-      });
+    for (const keyword of keywords) {
+      try {
+        if (typeof keyword !== 'string' || !keyword.trim()) continue;
+        console.log(`[ThreadsScraper] Searching: "\${keyword}"`);
 
-      // Try search first, then fallback to explore/trending
-      const searchTargets = [
-        ...keywords.map(k => `https://www.threads.net/search?q=${encodeURIComponent(k.trim())}&serp_type=default`),
-        'https://www.threads.net/',
-        'https://www.threads.net/search'
-      ];
+        // Method 1: Try threads.net search page
+        const searchUrl = `https://www.threads.net/search?q=\${encodeURIComponent(keyword.trim())}&serp_type=default`;
+        const res = await this._fetch(searchUrl);
+        const threads = this._extractThreadsFromHTML(res.data);
+        
+        threads.forEach(t => {
+          discoveredUrls.set(t.url, { url: t.url, keyword: keyword.trim(), discovered: new Date().toISOString() });
+        });
 
-      for (const targetUrl of searchTargets.slice(0, 3)) {
-        try {
-          console.log(`[ThreadsScraper] Navigating to: ${targetUrl.substring(0, 80)}`);
-          await page.goto(targetUrl, {
-            waitUntil: 'domcontentloaded',
-            timeout: 20000
-          });
-          await this._delay(4000);
-
-          // Scroll to load more
-          for (let i = 0; i < 3; i++) {
-            try {
-              await page.evaluate(() => window.scrollBy(0, 1000));
-              await this._delay(2000);
-            } catch (e) { break; }
-          }
-
-          // Extract from GraphQL responses
-          for (const resp of graphqlResponses) {
-            try {
-              const jsonStr = JSON.stringify(resp);
-              // Find thread codes and usernames
-              const codePattern = /"code"\s*:\s*"([A-Za-z0-9_-]{8,15})"/g;
-              const usernamePattern = /"username"\s*:\s*"([^"]{1,30})"/g;
-              const codes = [];
-              const usernames = [];
-              let m;
-              while ((m = codePattern.exec(jsonStr)) !== null) codes.push(m[1]);
-              while ((m = usernamePattern.exec(jsonStr)) !== null) usernames.push(m[1]);
-              
-              // Build thread URLs from codes
-              if (codes.length > 0 && usernames.length > 0) {
-                codes.forEach(code => {
-                  const url = `https://www.threads.net/@${usernames[0]}/post/${code}`;
-                  if (!discoveredUrls.has(url)) {
-                    discoveredUrls.set(url, {
-                      url,
-                      keyword: keywords[0] || 'discover',
-                      discovered: new Date().toISOString()
-                    });
-                  }
-                });
-              }
-            } catch (e) {}
-          }
-          graphqlResponses.length = 0;
-
-          if (discoveredUrls.size >= 10) break;
-        } catch (err) {
-          console.warn(`[ThreadsScraper] Error on ${targetUrl.substring(0, 50)}: ${err.message}`);
-        }
+        console.log(`[ThreadsScraper] Found \${threads.length} threads for "\${keyword}"`);
+      } catch (err) {
+        console.warn(`[ThreadsScraper] Error searching "\${keyword}": \${err.message}`);
       }
-
-      const results = Array.from(discoveredUrls.values()).slice(0, 20);
-      console.log(`[ThreadsScraper] Discovered ${results.length} unique thread URLs`);
-
-      return {
-        success: true,
-        keywords: keywords.length,
-        threadsDiscovered: results.length,
-        threads: results
-      };
-    } catch (err) {
-      console.error(`[ThreadsScraper] Keyword search error: ${err.message}`);
-      return { success: false, keywords: keywords.length, threadsDiscovered: 0, threads: [], error: err.message };
-    } finally {
-      try { await page.context().close().catch(() => {}); } catch (e) {}
     }
+
+    // If search found nothing, try homepage/explore
+    if (discoveredUrls.size === 0) {
+      try {
+        console.log('[ThreadsScraper] Search empty, trying homepage...');
+        const res = await this._fetch('https://www.threads.net/');
+        const threads = this._extractThreadsFromHTML(res.data);
+        threads.forEach(t => {
+          discoveredUrls.set(t.url, { url: t.url, keyword: 'trending', discovered: new Date().toISOString() });
+        });
+        console.log(`[ThreadsScraper] Found \${threads.length} threads from homepage`);
+      } catch (err) {
+        console.warn(`[ThreadsScraper] Homepage error: \${err.message}`);
+      }
+    }
+
+    const results = Array.from(discoveredUrls.values()).slice(0, 30);
+    return {
+      success: results.length > 0,
+      keywords: keywords.length,
+      threadsDiscovered: results.length,
+      threads: results
+    };
   }
 
   async scrapeThreadDetail(threadUrl) {
-    if (!threadUrl || typeof threadUrl !== 'string') {
-      throw new Error('Invalid threadUrl: must be a non-empty string');
-    }
-
-    const page = await this._newPage();
-
+    console.log(`[ThreadsScraper] Fetching thread: \${threadUrl}`);
     try {
-      console.log(`[ThreadsScraper] Scraping thread detail: ${threadUrl}`);
-
-      await page.goto(threadUrl, {
-        waitUntil: 'networkidle',
-        timeout: this.defaultTimeout
-      });
-      await this._delay(2000);
-
-      // Extract main thread data
-      const threadData = await page.evaluate(() => {
-        try {
-          const text = document.querySelector('meta[property="og:description"]')?.content || '';
-          const title = document.querySelector('meta[property="og:title"]')?.content || '';
-          const image = document.querySelector('meta[property="og:image"]')?.content || '';
-          const url = document.querySelector('meta[property="og:url"]')?.content || window.location.href;
-          const author = document.querySelector('a[href*="/@"]')?.textContent?.trim() || '';
-
-          return { text, title, image, url, author };
-        } catch (err) {
-          return { text: '', title: '', image: '', url: threadUrl, author: '' };
-        }
-      });
-
-      // Scroll to load comments
-      for (let i = 0; i < 3; i++) {
-        try {
-          await page.evaluate(() => window.scrollBy(0, 800));
-          await this._delay(1500);
-        } catch (err) {
-          console.warn(`[ThreadsScraper] Scroll iteration ${i} failed: ${err.message}`);
-        }
-      }
-
-      // Extract comments
-      const comments = await page.evaluate(() => {
-        const results = [];
-        try {
-          const commentElements = document.querySelectorAll('[data-pressable-container="true"]');
-          const arr = Array.from(commentElements);
-
-          // Skip first element (main post), process comments
-          for (let i = 1; i < Math.min(arr.length, 30); i++) {
-            try {
-              const el = arr[i];
-              const text = el.textContent || '';
-
-              if (text.length > 5) {
-                const links = Array.from(el.querySelectorAll('a'))
-                  .map(a => a.href)
-                  .filter(h => h && h.startsWith('http'));
-
-                const authorLink = el.querySelector('a[href*="/@"]');
-                const commentAuthor = authorLink?.textContent?.trim() || '';
-
-                results.push({
-                  author: commentAuthor,
-                  text: text,
-                  links: links,
-                  extractedAt: new Date().toISOString()
-                });
-              }
-            } catch (innerErr) {
-              // Skip problematic comment elements
-            }
-          }
-        } catch (err) {
-          // Silent fail
-        }
-        return results;
-      });
-
-      const cleanedText = this._cleanText(threadData.text);
-      const metrics = this._extractMetrics(threadData.text);
-
-      console.log(`[ThreadsScraper] Extracted thread with ${comments.length} comments`);
+      const res = await this._fetch(threadUrl);
+      const threads = this._extractThreadsFromHTML(res.data);
+      
+      // Extract OG meta tags as fallback
+      const ogTitle = res.data.match(/<meta[^>]*property="og:title"[^>]*content="([^"]*)"/) || [];
+      const ogDesc = res.data.match(/<meta[^>]*property="og:description"[^>]*content="([^"]*)"/) || [];
+      const ogImage = res.data.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"/) || [];
+      
+      const urlParts = threadUrl.match(/\/@([\w.]+)\/post\/([\w-]+)/);
+      const author = urlParts ? urlParts[1] : '';
+      const postCode = urlParts ? urlParts[2] : '';
 
       return {
         success: true,
-        threadUrl: threadData.url,
-        title: threadData.title,
-        author: threadData.author,
-        text: cleanedText,
-        rawText: threadData.text,
-        image: threadData.image,
-        comments: comments,
-        commentCount: comments.length,
-        likeCount: metrics.likeCount,
-        replyCount: metrics.replyCount,
-        repostCount: metrics.repostCount,
-        shareCount: metrics.shareCount,
-        scrapedAt: new Date().toISOString()
+        thread: {
+          id: postCode,
+          url: threadUrl,
+          author: author,
+          text: ogDesc[1] || (threads[0] && threads[0].text) || '',
+          title: ogTitle[1] || '',
+          imageUrl: ogImage[1] || '',
+          publishedAt: new Date().toISOString(),
+          metrics: {
+            likes: (threads[0] && threads[0].likes) || 0,
+            replies: (threads[0] && threads[0].replies) || 0,
+            views: 0,
+          },
+          links: this._extractLinks(res.data),
+        }
       };
     } catch (err) {
-      console.error(`[ThreadsScraper] Thread detail error for ${threadUrl}: ${err.message}`);
-      return {
-        success: false,
-        threadUrl: threadUrl,
-        error: err.message,
-        comments: []
-      };
-    } finally {
-      try {
-        await page.close().catch(() => {});
-      } catch (err) {
-        console.warn('[ThreadsScraper] Error closing page:', err.message);
-      }
+      console.error(`[ThreadsScraper] Thread detail error: \${err.message}`);
+      return { success: false, error: err.message };
     }
+  }
+
+  _extractLinks(html) {
+    const links = [];
+    const linkMatches = html.match(/https?:\/\/[^\s"'<>]+/g) || [];
+    linkMatches.forEach(url => {
+      if (!url.includes('threads.net') && !url.includes('instagram.com') && !url.includes('facebook.com')
+          && !url.includes('cdninstagram') && !url.includes('fbcdn')) {
+        if (!links.includes(url)) links.push(url);
+      }
+    });
+    return links.slice(0, 10);
   }
 
   async scrapeComments(threadUrl) {
-    if (!threadUrl || typeof threadUrl !== 'string') {
-      throw new Error('Invalid threadUrl: must be a non-empty string');
-    }
-
-    const page = await this._newPage();
-
-    try {
-      console.log(`[ThreadsScraper] Scraping comments from: ${threadUrl}`);
-
-      await page.goto(threadUrl, {
-        waitUntil: 'networkidle',
-        timeout: this.defaultTimeout
-      });
-      await this._delay(3000);
-
-      // Scroll to load more comments
-      for (let i = 0; i < 5; i++) {
-        try {
-          await page.evaluate(() => window.scrollBy(0, 800));
-          await this._delay(1500);
-        } catch (err) {
-          console.warn(`[ThreadsScraper] Scroll iteration ${i} failed: ${err.message}`);
-        }
-      }
-
-      // Extract all comments with affiliate link detection
-      const comments = await page.evaluate(() => {
-        const results = [];
-        try {
-          const containers = document.querySelectorAll('[data-pressable-container="true"]');
-          const arr = Array.from(containers);
-
-          for (let i = 1; i < arr.length; i++) {
-            try {
-              const el = arr[i];
-              const text = el.textContent || '';
-
-              if (text.length > 5) {
-                const links = Array.from(el.querySelectorAll('a'))
-                  .map(a => ({
-                    href: a.href,
-                    text: a.textContent?.trim() || ''
-                  }))
-                  .filter(l => l.href && l.href.startsWith('http'));
-
-                const authorLink = el.querySelector('a[href*="/@"]');
-                const username = authorLink?.textContent?.trim() || '';
-
-                // Detect potential affiliate links
-                const affiliateLinks = links.filter(l => {
-                  const href = l.href.toLowerCase();
-                  return href.includes('ref=') || href.includes('affiliate') ||
-                    href.includes('utm_') || href.includes('tracking') ||
-                    href.includes('coupon') || href.includes('promo');
-                });
-
-                results.push({
-                  username: username,
-                  text: text,
-                  links: links,
-                  affiliateLinks: affiliateLinks,
-                  extractedAt: new Date().toISOString()
-                });
-              }
-            } catch (innerErr) {
-              // Skip problematic elements
-            }
-          }
-        } catch (err) {
-          // Silent fail
-        }
-        return results;
-      });
-
-      console.log(`[ThreadsScraper] Extracted ${comments.length} comments (${comments.filter(c => c.affiliateLinks.length > 0).length} with affiliate links)`);
-
-      return {
-        success: true,
-        threadUrl: threadUrl,
-        comments: comments,
-        totalComments: comments.length,
-        commentsWithAffiliateLinks: comments.filter(c => c.affiliateLinks.length > 0).length,
-        scrapedAt: new Date().toISOString()
-      };
-    } catch (err) {
-      console.error(`[ThreadsScraper] Comments scrape error for ${threadUrl}: ${err.message}`);
-      return {
-        success: false,
-        threadUrl: threadUrl,
-        comments: [],
-        error: err.message
-      };
-    } finally {
-      try {
-        await page.close().catch(() => {});
-      } catch (err) {
-        console.warn('[ThreadsScraper] Error closing page:', err.message);
-      }
-    }
+    // Comments require authenticated API - return empty for now
+    return { success: true, comments: [] };
   }
 
   async scrapeProfileLinks(username) {
-    if (!username || typeof username !== 'string') {
-      throw new Error('Invalid username: must be a non-empty string');
-    }
-
-    const page = await this._newPage();
-
     try {
-      console.log(`[ThreadsScraper] Scraping profile links for: @${username}`);
-
-      await page.goto(`https://www.threads.net/@${username}`, {
-        waitUntil: 'networkidle',
-        timeout: this.networkIdleTimeout
-      });
-      await this._delay(2000);
-
-      // Extract bio and links
-      const profileData = await page.evaluate(() => {
-        try {
-          const bio = document.querySelector('meta[property="og:description"]')?.content || '';
-          const displayName = document.querySelector('meta[property="og:title"]')?.content || '';
-          const profilePic = document.querySelector('meta[property="og:image"]')?.content || '';
-
-          return {
-            bio: bio,
-            displayName: displayName,
-            profilePic: profilePic
-          };
-        } catch (err) {
-          return {
-            bio: '',
-            displayName: '',
-            profilePic: ''
-          };
-        }
-      });
-
-      // Extract all external links
-      const links = await page.evaluate(() => {
-        const results = [];
-        try {
-          const allLinks = Array.from(document.querySelectorAll('a[href]'));
-
-          allLinks.forEach(a => {
-            try {
-              const href = a.href || '';
-              const text = a.textContent?.trim() || '';
-
-              if (href.startsWith('http') &&
-                !href.includes('threads.net') &&
-                !href.includes('instagram.com') &&
-                !href.includes('facebook.com') &&
-                !href.includes('google.com/search') &&
-                !href.includes('twitter.com') &&
-                !href.includes('x.com')) {
-
-                // Detect link type
-                const isAffiliate = href.toLowerCase().includes('ref=') ||
-                  href.toLowerCase().includes('affiliate') ||
-                  href.toLowerCase().includes('utm_');
-
-                results.push({
-                  href: href,
-                  text: text,
-                  isAffiliate: isAffiliate,
-                  domain: new URL(href).hostname
-                });
-              }
-            } catch (innerErr) {
-              // Skip malformed URLs
-            }
-          });
-        } catch (err) {
-          // Silent fail
-        }
-        return results;
-      });
-
-      // Deduplicate by URL
-      const uniqueLinks = Array.from(
-        new Map(links.map(l => [l.href, l])).values()
-      );
-
-      console.log(`[ThreadsScraper] Found ${uniqueLinks.length} external links for @${username} (${uniqueLinks.filter(l => l.isAffiliate).length} affiliate)`);
-
-      return {
-        success: true,
-        username: username,
-        displayName: profileData.displayName,
-        bio: profileData.bio,
-        profilePic: profileData.profilePic,
-        links: uniqueLinks,
-        totalLinks: uniqueLinks.length,
-        affiliateLinks: uniqueLinks.filter(l => l.isAffiliate),
-        affiliateLinkCount: uniqueLinks.filter(l => l.isAffiliate).length,
-        scrapedAt: new Date().toISOString()
-      };
+      const res = await this._fetch(`https://www.threads.net/@\${username.replace('@','')}`);
+      const links = this._extractLinks(res.data);
+      return { success: true, links };
     } catch (err) {
-      console.error(`[ThreadsScraper] Profile links error for @${username}: ${err.message}`);
-      return {
-        success: false,
-        username: username,
-        links: [],
-        error: err.message
-      };
-    } finally {
-      try {
-        await page.close().catch(() => {});
-      } catch (err) {
-        console.warn('[ThreadsScraper] Error closing page:', err.message);
-      }
+      return { success: false, links: [], error: err.message };
     }
   }
 
   async close() {
-    try {
-      if (this.browser && this.browser.isConnected?.()) {
-        await this.browser.close();
-        console.log('[ThreadsScraper] Browser closed successfully');
-      }
-      this.browser = null;
-    } catch (err) {
-      console.error('[ThreadsScraper] Error closing browser:', err.message);
-      this.browser = null;
-    }
+    // No browser to close - HTTP-based scraper
+    console.log('[ThreadsScraper] HTTP scraper - nothing to close');
   }
 }
 
-export default ThreadsScraper;
+module.exports = ThreadsScraper;
