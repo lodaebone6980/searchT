@@ -283,15 +283,36 @@ class ThreadsScraper {
 
     const page = await this._newPage();
     const discoveredUrls = new Map();
+    const graphqlResponses = [];
 
     try {
+      // Intercept GraphQL responses (same pattern as scrapeProfile)
+      page.on('response', async (response) => {
+        try {
+          const url = response.url();
+          if (url.includes('/api/graphql') || url.includes('threads.net/graphql')) {
+            const contentType = response.headers()['content-type'] || '';
+            if (contentType.includes('json')) {
+              try {
+                const json = await response.json();
+                graphqlResponses.push(json);
+              } catch (parseErr) {
+                // Silent fail for parse errors
+              }
+            }
+          }
+        } catch (err) {
+          // Silent fail for response processing
+        }
+      });
+
       for (const keyword of keywords) {
         try {
           if (typeof keyword !== 'string' || !keyword.trim()) continue;
 
-          console.log(`[ThreadsScraper] Searching for keyword on Threads: "${keyword}"`);
-          
-          // Search directly on threads.net
+          console.log(`[ThreadsScraper] Searching Threads for: "${keyword}"`);
+          graphqlResponses.length = 0; // Clear for each keyword
+
           const searchUrl = `https://www.threads.net/search?q=${encodeURIComponent(keyword.trim())}&serp_type=default`;
           await page.goto(searchUrl, {
             waitUntil: 'networkidle',
@@ -299,47 +320,58 @@ class ThreadsScraper {
           });
           await this._delay(3000);
 
-          // Scroll to load more content
+          // Scroll to trigger more GraphQL loads
           for (let i = 0; i < 3; i++) {
             try {
               await page.evaluate(() => window.scrollBy(0, 800));
-              await this._delay(1500);
-            } catch (scrollErr) {
-              break;
-            }
+              await this._delay(2000);
+            } catch (scrollErr) { break; }
           }
 
-          // Extract thread URLs from the page
-          const urls = await page.evaluate(() => {
-            const results = [];
+          // Extract thread URLs from GraphQL responses
+          const threadUrls = new Set();
+          for (const resp of graphqlResponses) {
             try {
-              // Method 1: Find all links to thread posts
-              const links = document.querySelectorAll('a[href*="/post/"]');
-              links.forEach(a => {
-                const href = a.href;
-                if (href && href.includes('threads.net') && href.includes('/post/')) {
-                  results.push(href);
+              const jsonStr = JSON.stringify(resp);
+              // Find thread post codes (e.g., C1abc23DEfg)
+              const codeMatches = jsonStr.match(/"code":"([A-Za-z0-9_-]{6,15})"/g) || [];
+              codeMatches.forEach(m => {
+                const code = m.match(/"code":"([^"]+)"/)[1];
+                // Find associated username
+                const usernameMatch = jsonStr.match(/"username":"([^"]+)"/);
+                if (usernameMatch) {
+                  threadUrls.add(`https://www.threads.net/@${usernameMatch[1]}/post/${code}`);
                 }
               });
-              // Method 2: Find profile thread links
-              const profileLinks = document.querySelectorAll('a[href*="/@"]');
-              profileLinks.forEach(a => {
-                const href = a.href;
-                if (href && href.includes('threads.net/@') && href.includes('/post/')) {
-                  results.push(href);
-                }
-              });
+              // Also look for direct post URLs in the response
+              const urlMatches = jsonStr.match(/threads\.net\/@[\w.]+\/post\/[A-Za-z0-9_-]+/g) || [];
+              urlMatches.forEach(u => threadUrls.add('https://www.' + u.replace(/\\/g, '')));
             } catch (e) {
               // Silent fail
             }
-            return [...new Set(results)].slice(0, 15);
-          });
+          }
 
-          urls.forEach(url => {
+          // Also try extracting from DOM as fallback
+          try {
+            const domUrls = await page.evaluate(() => {
+              const results = [];
+              document.querySelectorAll('a').forEach(a => {
+                const href = a.href || '';
+                if (href.includes('threads.net/') && href.includes('/post/')) {
+                  results.push(href);
+                }
+              });
+              return [...new Set(results)];
+            });
+            domUrls.forEach(u => threadUrls.add(u));
+          } catch (e) {}
+
+          const urlArray = [...threadUrls].slice(0, 15);
+          urlArray.forEach(url => {
             discoveredUrls.set(url, { url, keyword: keyword.trim(), discovered: new Date().toISOString() });
           });
 
-          console.log(`[ThreadsScraper] Found ${urls.length} threads for keyword "${keyword}"`);
+          console.log(`[ThreadsScraper] Found ${urlArray.length} threads for keyword "${keyword}"`);
           await this._delay(2000);
         } catch (err) {
           console.warn(`[ThreadsScraper] Error searching keyword "${keyword}": ${err.message}`);
@@ -347,7 +379,7 @@ class ThreadsScraper {
       }
 
       const results = Array.from(discoveredUrls.values());
-      console.log(`[ThreadsScraper] Discovered ${results.length} unique thread URLs`);
+      console.log(`[ThreadsScraper] Discovered ${results.length} unique thread URLs total`);
 
       return {
         success: true,
