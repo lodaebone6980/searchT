@@ -1,12 +1,16 @@
 /**
  * popup.js - 팝업 UI 로직
+ * v2: 자동 스크롤 제어 UI 추가
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  const autoToggle = document.getElementById('autoToggle');
+  const scrollToggle = document.getElementById('scrollToggle');
   const btnCollect = document.getElementById('btnCollect');
   const btnFlush = document.getElementById('btnFlush');
   const btnReset = document.getElementById('btnReset');
+  const speedButtons = document.querySelectorAll('.speed-btn');
+
+  let currentSpeed = 'medium';
 
   // ============ 통계 업데이트 ============
 
@@ -33,6 +37,57 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data.recentLogs && data.recentLogs.length > 0) {
       renderLogs(data.recentLogs);
     }
+
+    // 스크롤 상태 업데이트
+    if (data.scrollStatus) {
+      updateScrollUI(data.scrollStatus);
+    }
+  }
+
+  function updateScrollUI(status) {
+    const scrollIcon = document.getElementById('scrollIcon');
+    const scrollStatusBox = document.getElementById('scrollStatusBox');
+    const scrollCount = document.getElementById('scrollCount');
+    const refreshCount = document.getElementById('refreshCount');
+    const scrollState = document.getElementById('scrollState');
+
+    if (status.active) {
+      scrollToggle.checked = true;
+      scrollStatusBox.style.display = 'flex';
+
+      scrollCount.textContent = status.totalScrolls || 0;
+      refreshCount.textContent = status.refreshCount || 0;
+
+      if (status.isPaused) {
+        scrollIcon.textContent = '👀';
+        scrollIcon.className = 'scroll-icon';
+        scrollState.textContent = '읽는 중...';
+        scrollState.className = 'scroll-stat-value paused';
+      } else {
+        scrollIcon.textContent = '🔄';
+        scrollIcon.className = 'scroll-icon active';
+        scrollState.textContent = '스크롤 중';
+        scrollState.className = 'scroll-stat-value';
+      }
+
+      // 속도 버튼 동기화
+      if (status.speed) {
+        currentSpeed = status.speed;
+        syncSpeedButtons(status.speed);
+      }
+    } else {
+      if (!scrollToggle.checked) {
+        scrollStatusBox.style.display = 'none';
+      }
+      scrollIcon.textContent = '⏸';
+      scrollIcon.className = 'scroll-icon';
+    }
+  }
+
+  function syncSpeedButtons(speed) {
+    speedButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.speed === speed);
+    });
   }
 
   function renderLogs(logs) {
@@ -71,14 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ============ 초기 로드 ============
 
-  // 통계 가져오기
   chrome.runtime.sendMessage({ type: 'stats:get' }, (response) => {
     if (response) updateUI(response);
-  });
-
-  // 자동 수집 상태 확인
-  chrome.storage.local.get(['autoCollect'], (result) => {
-    autoToggle.checked = result.autoCollect || false;
   });
 
   // 현재 탭 상태 확인
@@ -87,20 +136,51 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tab && (tab.url.includes('threads.net') || tab.url.includes('threads.com'))) {
       document.getElementById('statusText').textContent = '✅ Threads 페이지 감지됨';
       btnCollect.disabled = false;
+
+      // content script에서 스크롤 상태도 확인
+      chrome.tabs.sendMessage(tab.id, { type: 'status:get' }, (resp) => {
+        if (chrome.runtime.lastError) return;
+        if (resp) {
+          scrollToggle.checked = resp.isScrolling || false;
+          if (resp.isScrolling) {
+            document.getElementById('scrollStatusBox').style.display = 'flex';
+            syncSpeedButtons(resp.scrollSpeed || 'medium');
+          }
+        }
+      });
     } else {
       document.getElementById('statusText').textContent = '⚠️ Threads 페이지를 열어주세요';
       btnCollect.disabled = true;
       btnCollect.style.opacity = '0.5';
+      scrollToggle.disabled = true;
     }
   });
 
   // ============ 이벤트 핸들러 ============
 
-  // 자동 수집 토글
-  autoToggle.addEventListener('change', (e) => {
+  // 자동 스크롤 토글
+  scrollToggle.addEventListener('change', (e) => {
     chrome.runtime.sendMessage({
-      type: 'collector:toggle',
-      enabled: e.target.checked
+      type: 'scroll:toggle',
+      enabled: e.target.checked,
+      speed: currentSpeed,
+    });
+
+    if (e.target.checked) {
+      document.getElementById('scrollStatusBox').style.display = 'flex';
+    }
+  });
+
+  // 속도 버튼 클릭
+  speedButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentSpeed = btn.dataset.speed;
+      syncSpeedButtons(currentSpeed);
+
+      chrome.runtime.sendMessage({
+        type: 'scroll:setSpeed',
+        speed: currentSpeed,
+      });
     });
   });
 
@@ -121,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
           setTimeout(() => {
             btnCollect.textContent = '🔄 지금 수집하기';
             btnCollect.disabled = false;
-            // 통계 새로고침
             chrome.runtime.sendMessage({ type: 'stats:get' }, (r) => {
               if (r) updateUI(r);
             });
@@ -159,13 +238,35 @@ document.addEventListener('DOMContentLoaded', () => {
   // ============ 실시간 업데이트 ============
 
   chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === 'batch:result') {
-      // 통계 새로고침
+    if (message.type === 'batch:result' || message.type === 'scroll:statusUpdate') {
       chrome.runtime.sendMessage({ type: 'stats:get' }, (r) => {
+        if (chrome.runtime.lastError) return;
         if (r) updateUI(r);
       });
     }
+
+    // 자동 스크롤 중지 알림
+    if (message.type === 'scroll:stopped') {
+      scrollToggle.checked = false;
+      showNotification(message.message || '자동 스크롤이 중지되었습니다.', 'warning');
+    }
   });
+
+  // 알림 배너 표시
+  function showNotification(text, type) {
+    // 기존 알림 제거
+    const existing = document.querySelector('.notification');
+    if (existing) existing.remove();
+
+    const notif = document.createElement('div');
+    notif.className = `notification ${type || 'info'}`;
+    notif.textContent = text;
+
+    const header = document.querySelector('.header');
+    header.after(notif);
+
+    setTimeout(() => notif.remove(), 5000);
+  }
 
   // 2초마다 통계 업데이트
   setInterval(() => {
