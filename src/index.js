@@ -1,62 +1,99 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import { CronJob } from 'cron';
+import mongoose from 'mongoose';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import config from './config/index.js';
-import logger from './utils/logger.js';
-import routes from './api/routes.js';
-import CollectorEngine from './collectors/CollectorEngine.js';
+import router, { engine } from './api/routes.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const app = express();
+const PORT = process.env.PORT || 3001;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/threads-collector';
+const COLLECT_INTERVAL_HOURS = parseInt(process.env.COLLECT_INTERVAL_HOURS || '3', 10);
 
-app.use(helmet({ contentSecurityPolicy: false }));
+// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
-
-// Static files (Korean dashboard)
 app.use(express.static(join(__dirname, '..', 'public')));
 
-// API Routes
-app.use('/api', routes);
+// Store engine in app for route access
+app.set('collectorEngine', engine);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+// API routes
+app.use('/api', router);
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  res.json({
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
-async function start() {
-  try {
-    await mongoose.connect(config.mongodb.uri);
-    logger.info('MongoDB connected');
-    const engine = new CollectorEngine();
-    app.set('collectorEngine', engine);
-    if (config.env === 'production') {
-      const cron = '*/' + config.collector.intervalMinutes + ' * * * *';
-      const job = new CronJob(cron, () => {
-        engine.runCollectionCycle().catch(e => logger.error('Cron error', { error: e.message }));
-      });
-      job.start();
-      logger.info('Cron started: every ' + config.collector.intervalMinutes + ' min');
-    }
-    app.listen(config.port, () => {
-      logger.info('Server on port ' + config.port + ' [' + config.env + ']');
-    });
-  } catch (error) {
-    logger.error('Start failed', { error: error.message });
-    process.exit(1);
-  }
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('[MongoDB] Connected successfully'))
+  .catch(err => console.error('[MongoDB] Connection error:', err.message));
+
+// Auto-collection scheduler
+let autoCollectTimer = null;
+
+function startAutoCollector() {
+  console.log(`[AutoCollect] Initialized with interval: ${COLLECT_INTERVAL_HOURS} hours`);
+
+  // Initial collection after 5 minutes of startup
+  const initialDelay = setTimeout(() => {
+    console.log('[AutoCollect] Running initial collection...');
+    engine.runAutoCollection().catch(err => console.error('[AutoCollect] Initial collection error:', err));
+  }, 5 * 60 * 1000);
+
+  // Recurring collection every COLLECT_INTERVAL_HOURS
+  autoCollectTimer = setInterval(() => {
+    console.log('[AutoCollect] Running scheduled collection...');
+    engine.runAutoCollection().catch(err => console.error('[AutoCollect] Scheduled collection error:', err));
+  }, COLLECT_INTERVAL_HOURS * 60 * 60 * 1000);
+
+  // Cleanup initial timer on shutdown
+  process.on('exit', () => clearTimeout(initialDelay));
 }
 
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received');
-  await mongoose.disconnect();
-  process.exit(0);
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`[Server] Running on port ${PORT}`);
+  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Start auto-collector (runs in all environments for flexibility)
+  startAutoCollector();
 });
 
-start();
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('[Server] SIGTERM received, shutting down gracefully...');
+
+  if (autoCollectTimer) {
+    clearInterval(autoCollectTimer);
+    console.log('[Server] Auto-collection interval cleared');
+  }
+
+  server.close(async () => {
+    try {
+      await mongoose.disconnect();
+      console.log('[MongoDB] Disconnected');
+    } catch (err) {
+      console.error('[MongoDB] Disconnect error:', err.message);
+    }
+    process.exit(0);
+  });
+});
+
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught exception:', err);
+  process.exit(1);
+});
+
+export { app, engine };
