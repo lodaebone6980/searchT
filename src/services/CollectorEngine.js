@@ -269,7 +269,7 @@ class CollectorEngine {
           mentions: (cleanText.match(/@[\w.]+/g) || []),
         },
         category: {
-          primary: category || 'uncategorized',
+          primary: ['shopping', 'issue', 'personal', 'uncategorized'].includes(category) ? category : 'uncategorized',
           classifiedBy: 'rule',
           classifiedAt: new Date(),
         },
@@ -343,7 +343,7 @@ class CollectorEngine {
    * Classify thread category by keywords
    */
   classifyCategory(text) {
-    if (!text) return 'other';
+    if (!text) return 'uncategorized';
 
     const lowerText = text.toLowerCase();
 
@@ -357,7 +357,7 @@ class CollectorEngine {
       }
     }
 
-    return 'other';
+    return 'uncategorized';
   }
 
   /**
