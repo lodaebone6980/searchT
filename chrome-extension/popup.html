@@ -16,72 +16,103 @@
     <a href="https://searcht-production.up.railway.app" target="_blank" class="dashboard-link" title="대시보드 열기">📊</a>
   </div>
 
-  <!-- 자동 수집 토글 -->
-  <div class="toggle-section">
-    <span class="toggle-label">자동 수집</span>
-    <label class="toggle-switch">
-      <input type="checkbox" id="autoToggle">
-      <span class="slider"></span>
-    </label>
+  <!-- 자동 스크롤 섹션 -->
+  <div class="scroll-section">
+    <div class="scroll-header">
+      <div class="scroll-title">
+        <span class="scroll-icon" id="scrollIcon">⏸</span>
+        <span>자동 스크롤 수집</span>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="scrollToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- 스크롤 속도 선택 -->
+    <div class="speed-selector" id="speedSelector">
+      <div class="speed-label">스크롤 속도</div>
+      <div class="speed-buttons">
+        <button class="speed-btn" data-speed="slow" title="3~7;-\uC55D 8d;,\uC55D ;30% \uB9C8\uCD94 \uD655\uB960">🐢 \uB290\uB9AC\uAC8C</button>
+        <button class="speed-btn active" data-speed="medium" title="1.5~4\uC55D 8d;,\uC55D;20% \uB9C8\uCD54 \uD655\uB960">🚶 \uBCF4\uD6B5</button>
+        <button class="speed-btn" data-speed="fast" title="0.8~2d;,\uC55D;10% \uB9C8\uCD54 \uD655\uB960">🏃 \uBE60\uB974\uAC8C</button>
+      </div>
+    </div>
+
+    <!-- 스크롤 상태 -->
+    <div class="scroll-status" id="scrollStatusBox" style="display:none;">
+      <div class="scroll-stat">
+        <span class="scroll-stat-label">\uC2A4\uD1EC\uB1B4</span>
+        <span class="scroll-stat-value" id="scrollCount">0</span>
+      </div>
+      <div class="scroll-stat">
+        <span class="scroll-stat-label">\uC0C8\uB85C\uACE0\uCE58</span>
+        <span class="scroll-stat-value" id="refreshCount">0</span>
+      </div>
+      <div class="scroll-stat">
+        <span class="scroll-stat-label">\uC0C1\uD0DC</span>
+        <span class="scroll-stat-value" id="scrollState">\uB300\uAE30</span>
+      </div>
+    </div>
   </div>
 
-  <!-- 통계 -->
+  <!-- \uD86D\uACC4 -->
   <div class="stats-grid">
     <div class="stat-card stat-collected">
       <div class="stat-icon">✓</div>
       <div class="stat-info">
         <div class="stat-value" id="statCollected">0</div>
-        <div class="stat-label">수집됨</div>
+        <div class="stat-label">\uC218\uC9D1\uB428</div>
       </div>
     </div>
     <div class="stat-card stat-sent">
       <div class="stat-icon">📤</div>
       <div class="stat-info">
         <div class="stat-value" id="statSent">0</div>
-        <div class="stat-label">전송됨</div>
+        <div class="stat-label">\uC804\uC1A1\uB428</div>
       </div>
     </div>
     <div class="stat-card stat-dupes">
       <div class="stat-icon">↺</div>
       <div class="stat-info">
         <div class="stat-value" id="statDupes">0</div>
-        <div class="stat-label">중복</div>
+        <div class="stat-label">\uC911\uBCF5</div>
       </div>
     </div>
     <div class="stat-card stat-errors">
       <div class="stat-icon">✗</div>
       <div class="stat-info">
         <div class="stat-value" id="statErrors">0</div>
-        <div class="stat-label">오류</div>
+        <div class="stat-label">\uC624\uB958</div>
       </div>
     </div>
   </div>
 
-  <!-- 액션 버튼 -->
+  <!-- \uC561\uC158 \uBC84\uD2B8 -->
   <div class="actions">
-    <button id="btnCollect" class="btn btn-primary">🔄 지금 수집하기</button>
-    <button id="btnFlush" class="btn btn-secondary">📤 즉시 전송</button>
+    <button id="btnCollect" class="btn btn-primary">🔄 \uC9C0\uAE08 \uC218\uC9D1\uD558\uAE30</button>
+    <button id="btnFlush" class="btn btn-secondary">📤 \uC989\uC2DC \uC804\uC1A1</button>
   </div>
 
-  <!-- 대기열 상태 -->
+  <!-- \uB300\uAE30\uC5F4 \uC0C1\uD0D0 -->
   <div class="queue-info" id="queueInfo" style="display:none;">
-    <span>⏳ 대기열: <strong id="queueSize">0</strong>개</span>
+    <span>⏳ \uB300\uAE30\uC5F4: <strong id="queueSize">0</strong>\uAC1C</span>
   </div>
 
-  <!-- 최근 수집 로그 -->
+  <!-- \uC5C8\uADFC \uC218\uC9D1 \uB85C\uADDC -->
   <div class="log-section">
     <div class="log-header">
-      <span>최근 수집</span>
-      <button id="btnReset" class="btn-text">초기화</button>
+      <span>\uC5C8\uADFC \uC218\uC9D1</span>
+      <button id="btnReset" class="btn-text">\uCD08\uAE30\uD654</button>
     </div>
     <div class="log-list" id="logList">
-      <div class="log-empty">아직 수집된 스레드가 없습니다.</div>
+      <div class="log-empty">\uC544\uC9C1\uC218\uC9D1\uB428 \uC2A4\uB808\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.</div>
     </div>
   </div>
 
-  <!-- 상태 바 -->
+  <!-- \uC0C1\uD0DC \uBC14 -->
   <div class="status-bar" id="statusBar">
-    <span id="statusText">준비됨</span>
+    <span id="statusText">\uC900\uBE44\uB428</span>
     <span id="lastSent"></span>
   </div>
 
