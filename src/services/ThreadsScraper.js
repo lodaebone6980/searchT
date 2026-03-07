@@ -1,5 +1,5 @@
 // ThreadsScraper - HTTP-based Threads data collector (no Playwright needed)
-const https = require('https');
+import https from 'https';
 
 class ThreadsScraper {
   constructor() {
@@ -254,4 +254,4 @@ class ThreadsScraper {
   }
 }
 
-module.exports = ThreadsScraper;
+export default ThreadsScraper;
