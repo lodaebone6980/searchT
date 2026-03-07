@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threads 수집기</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-left">
+      <span class="logo">🧵</span>
+      <span class="title">Threads 수집기</span>
+    </div>
+    <a href="https://searcht-production.up.railway.app" target="_blank" class="dashboard-link" title="대시보드 열기">📊</a>
+  </div>
+
+  <!-- 자동 수집 토글 -->
+  <div class="toggle-section">
+    <span class="toggle-label">자동 수집</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="autoToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <!-- 통계 -->
+  <div class="stats-grid">
+    <div class="stat-card stat-collected">
+      <div class="stat-icon">✓</div>
+      <div class="stat-info">
+        <div class="stat-value" id="statCollected">0</div>
+        <div class="stat-label">수집됨</div>
+      </div>
+    </div>
+    <div class="stat-card stat-sent">
+      <div class="stat-icon">📤</div>
+      <div class="stat-info">
+        <div class="stat-value" id="statSent">0</div>
+        <div class="stat-label">전송됨</div>
+      </div>
+    </div>
+    <div class="stat-card stat-dupes">
+      <div class="stat-icon">↺</div>
+      <div class="stat-info">
+        <div class="stat-value" id="statDupes">0</div>
+        <div class="stat-label">중복</div>
+      </div>
+    </div>
+    <div class="stat-card stat-errors">
+      <div class="stat-icon">✗</div>
+      <div class="stat-info">
+        <div class="stat-value" id="statErrors">0</div>
+        <div class="stat-label">오류</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 액션 버튼 -->
+  <div class="actions">
+    <button id="btnCollect" class="btn btn-primary">🔄 지금 수집하기</button>
+    <button id="btnFlush" class="btn btn-secondary">📤 즉시 전송</button>
+  </div>
+
+  <!-- 대기열 상태 -->
+  <div class="queue-info" id="queueInfo" style="display:none;">
+    <span>⏳ 대기열: <strong id="queueSize">0</strong>개</span>
+  </div>
+
+  <!-- 최근 수집 로그 -->
+  <div class="log-section">
+    <div class="log-header">
+      <span>최근 수집</span>
+      <button id="btnReset" class="btn-text">초기화</button>
+    </div>
+    <div class="log-list" id="logList">
+      <div class="log-empty">아직 수집된 스레드가 없습니다.</div>
+    </div>
+  </div>
+
+  <!-- 상태 바 -->
+  <div class="status-bar" id="statusBar">
+    <span id="statusText">준비됨</span>
+    <span id="lastSent"></span>
+  </div>
+
+  <script src="js/popup.js"></script>
+</body>
+</html>
