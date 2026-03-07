@@ -141,9 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.tabs.sendMessage(tab.id, { type: 'status:get' }, (resp) => {
         if (chrome.runtime.lastError) return;
         if (resp) {
-          scrollToggle.checked = resp.isScrolling || false;
           if (resp.isScrolling) {
-            document.getElementById('scrollStatusBox').style.display = 'flex';
+            setCollectingState(true);
             syncSpeedButtons(resp.scrollSpeed || 'medium');
           }
         }
@@ -166,9 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
       speed: currentSpeed,
     });
 
-    if (e.target.checked) {
-      document.getElementById('scrollStatusBox').style.display = 'flex';
-    }
+    setCollectingState(e.target.checked);
   });
 
   // 속도 버튼 클릭
@@ -184,30 +181,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 수동 수집 버튼
+  // 수집하기 버튼 → 자동 스크롤+수집 시작/중지 토글
+  let isCollecting = false;
+
+  function setCollectingState(active) {
+    isCollecting = active;
+    if (active) {
+      btnCollect.textContent = '⏹ 수집 중지';
+      btnCollect.style.background = '#EF4444';
+      scrollToggle.checked = true;
+      document.getElementById('scrollStatusBox').style.display = 'flex';
+    } else {
+      btnCollect.textContent = '🔄 수집하기';
+      btnCollect.style.background = '';
+      scrollToggle.checked = false;
+    }
+  }
+
   btnCollect.addEventListener('click', () => {
-    btnCollect.textContent = '⏳ 수집 중...';
-    btnCollect.disabled = true;
-
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: 'manual:collect' }, (response) => {
-          if (response) {
-            btnCollect.textContent = `✓ ${response.collected}개 수집됨!`;
-          } else {
-            btnCollect.textContent = '⚠️ 수집 실패';
-          }
-
-          setTimeout(() => {
-            btnCollect.textContent = '🔄 지금 수집하기';
-            btnCollect.disabled = false;
-            chrome.runtime.sendMessage({ type: 'stats:get' }, (r) => {
-              if (r) updateUI(r);
-            });
-          }, 2000);
-        });
-      }
-    });
+    if (isCollecting) {
+      // 중지
+      chrome.runtime.sendMessage({
+        type: 'scroll:toggle',
+        enabled: false,
+      });
+      setCollectingState(false);
+    } else {
+      // 시작: 자동 스크롤 + 자동 수집
+      chrome.runtime.sendMessage({
+        type: 'scroll:toggle',
+        enabled: true,
+        speed: currentSpeed,
+      });
+      setCollectingState(true);
+    }
   });
 
   // 즉시 전송 버튼
@@ -247,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 자동 스크롤 중지 알림
     if (message.type === 'scroll:stopped') {
-      scrollToggle.checked = false;
+      setCollectingState(false);
       showNotification(message.message || '자동 스크롤이 중지되었습니다.', 'warning');
     }
   });
