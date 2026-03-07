@@ -289,29 +289,50 @@ class ThreadsScraper {
         try {
           if (typeof keyword !== 'string' || !keyword.trim()) continue;
 
-          const query = encodeURIComponent(`site:threads.net "${keyword.trim()}"`);
-          console.log(`[ThreadsScraper] Searching for keyword: "${keyword}"`);
-
-          await page.goto(`https://www.google.com/search?q=${query}&num=20`, {
+          console.log(`[ThreadsScraper] Searching for keyword on Threads: "${keyword}"`);
+          
+          // Search directly on threads.net
+          const searchUrl = `https://www.threads.net/search?q=${encodeURIComponent(keyword.trim())}&serp_type=default`;
+          await page.goto(searchUrl, {
             waitUntil: 'networkidle',
-            timeout: this.networkIdleTimeout
+            timeout: this.defaultTimeout
           });
-          await this._delay(2000);
+          await this._delay(3000);
 
+          // Scroll to load more content
+          for (let i = 0; i < 3; i++) {
+            try {
+              await page.evaluate(() => window.scrollBy(0, 800));
+              await this._delay(1500);
+            } catch (scrollErr) {
+              break;
+            }
+          }
+
+          // Extract thread URLs from the page
           const urls = await page.evaluate(() => {
             const results = [];
             try {
-              const links = document.querySelectorAll('a[href*="threads.net"]');
+              // Method 1: Find all links to thread posts
+              const links = document.querySelectorAll('a[href*="/post/"]');
               links.forEach(a => {
+                const href = a.href;
+                if (href && href.includes('threads.net') && href.includes('/post/')) {
+                  results.push(href);
+                }
+              });
+              // Method 2: Find profile thread links
+              const profileLinks = document.querySelectorAll('a[href*="/@"]');
+              profileLinks.forEach(a => {
                 const href = a.href;
                 if (href && href.includes('threads.net/@') && href.includes('/post/')) {
                   results.push(href);
                 }
               });
-            } catch (err) {
+            } catch (e) {
               // Silent fail
             }
-            return Array.from(new Set(results)).slice(0, 10);
+            return [...new Set(results)].slice(0, 15);
           });
 
           urls.forEach(url => {
@@ -319,7 +340,7 @@ class ThreadsScraper {
           });
 
           console.log(`[ThreadsScraper] Found ${urls.length} threads for keyword "${keyword}"`);
-          await this._delay(3000);
+          await this._delay(2000);
         } catch (err) {
           console.warn(`[ThreadsScraper] Error searching keyword "${keyword}": ${err.message}`);
         }
