@@ -75,9 +75,13 @@ class CollectorEngine {
                 this.stats.errors++;
               }
             }
+          // Delay between keywords to prevent OOM
+            await new Promise(r => setTimeout(r, 2000));
           } catch (error) {
             this.logEvent(`Error searching keyword ${keyword}: ${error.message}`, 'error');
             this.stats.errors++;
+            // Browser crashed - force restart
+            try { await this.scraper.close(); } catch(e) {}
           }
         }
       }
