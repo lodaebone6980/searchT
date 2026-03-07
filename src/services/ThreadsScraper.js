@@ -42,6 +42,66 @@ class ThreadsScraper {
         locale: 'ko-KR',
         ignoreHTTPSErrors: true,
       });
+      // Block heavy resources to save memory
+      await context.route('**/*.{png,jpg,jpeg,gif,svg,webp,woff,woff2,ttf,eot}', route => route.abort());
+      await context.route('**/*', (route, request) => {
+        const type = request.resourceType();
+        if (['image', 'font', 'media'].includes(type)) return route.abort();
+        return route.continue();
+      });
+      const page = await context.newPage();
+      return page;
+    } catch (err) {
+      console.error('[ThreadsScraper] Error creating page:', err.message);
+      // Reset browser on error
+      this.browser = null;
+      throw err;
+    }
+  }
+import { chromium } from 'playwright-core';
+
+class ThreadsScraper {
+  constructor() {
+    this.browser = null;
+    this.executablePath = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
+    this.defaultTimeout = 30000;
+    this.networkIdleTimeout = 25000;
+  }
+
+  async _getBrowser() {
+    if (!this.browser || !this.browser.isConnected()) {
+      try {
+        this.browser = await chromium.launch({
+          executablePath: this.executablePath,
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process',
+            '--disable-web-resources',
+            '--disable-extensions',
+            '--disable-plugins'
+          ]
+        });
+      } catch (err) {
+        console.error('[ThreadsScraper] Browser launch error:', err.message);
+        throw new Error(`Failed to launch browser: ${err.message}`);
+      }
+    }
+    return this.browser;
+  }
+
+  async _newPage() {
+    const browser = await this._getBrowser();
+    try {
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1280, height: 800 },
+        locale: 'ko-KR',
+        ignoreHTTPSErrors: true,
+      });
       const page = await context.newPage();
       return page;
     } catch (err) {
@@ -286,100 +346,84 @@ class ThreadsScraper {
     const graphqlResponses = [];
 
     try {
-      // Intercept GraphQL responses (same pattern as scrapeProfile)
+      // Intercept GraphQL responses
       page.on('response', async (response) => {
         try {
           const url = response.url();
-          if (url.includes('/api/graphql') || url.includes('threads.net/graphql')) {
+          if (url.includes('/api/graphql') || url.includes('threads.net/graphql') || url.includes('i.instagram.com/api')) {
             const contentType = response.headers()['content-type'] || '';
             if (contentType.includes('json')) {
               try {
                 const json = await response.json();
                 graphqlResponses.push(json);
-              } catch (parseErr) {
-                // Silent fail for parse errors
-              }
+              } catch (e) {}
             }
           }
-        } catch (err) {
-          // Silent fail for response processing
-        }
+        } catch (e) {}
       });
 
-      for (const keyword of keywords) {
+      // Try search first, then fallback to explore/trending
+      const searchTargets = [
+        ...keywords.map(k => `https://www.threads.net/search?q=${encodeURIComponent(k.trim())}&serp_type=default`),
+        'https://www.threads.net/',
+        'https://www.threads.net/search'
+      ];
+
+      for (const targetUrl of searchTargets.slice(0, 3)) {
         try {
-          if (typeof keyword !== 'string' || !keyword.trim()) continue;
-
-          console.log(`[ThreadsScraper] Searching Threads for: "${keyword}"`);
-          graphqlResponses.length = 0; // Clear for each keyword
-
-          const searchUrl = `https://www.threads.net/search?q=${encodeURIComponent(keyword.trim())}&serp_type=default`;
-          await page.goto(searchUrl, {
-            waitUntil: 'networkidle',
-            timeout: this.defaultTimeout
+          console.log(`[ThreadsScraper] Navigating to: ${targetUrl.substring(0, 80)}`);
+          await page.goto(targetUrl, {
+            waitUntil: 'domcontentloaded',
+            timeout: 20000
           });
-          await this._delay(3000);
+          await this._delay(4000);
 
-          // Scroll to trigger more GraphQL loads
+          // Scroll to load more
           for (let i = 0; i < 3; i++) {
             try {
-              await page.evaluate(() => window.scrollBy(0, 800));
+              await page.evaluate(() => window.scrollBy(0, 1000));
               await this._delay(2000);
-            } catch (scrollErr) { break; }
+            } catch (e) { break; }
           }
 
-          // Extract thread URLs from GraphQL responses
-          const threadUrls = new Set();
+          // Extract from GraphQL responses
           for (const resp of graphqlResponses) {
             try {
               const jsonStr = JSON.stringify(resp);
-              // Find thread post codes (e.g., C1abc23DEfg)
-              const codeMatches = jsonStr.match(/"code":"([A-Za-z0-9_-]{6,15})"/g) || [];
-              codeMatches.forEach(m => {
-                const code = m.match(/"code":"([^"]+)"/)[1];
-                // Find associated username
-                const usernameMatch = jsonStr.match(/"username":"([^"]+)"/);
-                if (usernameMatch) {
-                  threadUrls.add(`https://www.threads.net/@${usernameMatch[1]}/post/${code}`);
-                }
-              });
-              // Also look for direct post URLs in the response
-              const urlMatches = jsonStr.match(/threads\.net\/@[\w.]+\/post\/[A-Za-z0-9_-]+/g) || [];
-              urlMatches.forEach(u => threadUrls.add('https://www.' + u.replace(/\\/g, '')));
-            } catch (e) {
-              // Silent fail
-            }
+              // Find thread codes and usernames
+              const codePattern = /"code"\s*:\s*"([A-Za-z0-9_-]{8,15})"/g;
+              const usernamePattern = /"username"\s*:\s*"([^"]{1,30})"/g;
+              const codes = [];
+              const usernames = [];
+              let m;
+              while ((m = codePattern.exec(jsonStr)) !== null) codes.push(m[1]);
+              while ((m = usernamePattern.exec(jsonStr)) !== null) usernames.push(m[1]);
+              
+              // Build thread URLs from codes
+              if (codes.length > 0 && usernames.length > 0) {
+                codes.forEach(code => {
+                  const url = `https://www.threads.net/@${usernames[0]}/post/${code}`;
+                  if (!discoveredUrls.has(url)) {
+                    discoveredUrls.set(url, {
+                      url,
+                      keyword: keywords[0] || 'discover',
+                      discovered: new Date().toISOString()
+                    });
+                  }
+                });
+              }
+            } catch (e) {}
           }
+          graphqlResponses.length = 0;
 
-          // Also try extracting from DOM as fallback
-          try {
-            const domUrls = await page.evaluate(() => {
-              const results = [];
-              document.querySelectorAll('a').forEach(a => {
-                const href = a.href || '';
-                if (href.includes('threads.net/') && href.includes('/post/')) {
-                  results.push(href);
-                }
-              });
-              return [...new Set(results)];
-            });
-            domUrls.forEach(u => threadUrls.add(u));
-          } catch (e) {}
-
-          const urlArray = [...threadUrls].slice(0, 15);
-          urlArray.forEach(url => {
-            discoveredUrls.set(url, { url, keyword: keyword.trim(), discovered: new Date().toISOString() });
-          });
-
-          console.log(`[ThreadsScraper] Found ${urlArray.length} threads for keyword "${keyword}"`);
-          await this._delay(2000);
+          if (discoveredUrls.size >= 10) break;
         } catch (err) {
-          console.warn(`[ThreadsScraper] Error searching keyword "${keyword}": ${err.message}`);
+          console.warn(`[ThreadsScraper] Error on ${targetUrl.substring(0, 50)}: ${err.message}`);
         }
       }
 
-      const results = Array.from(discoveredUrls.values());
-      console.log(`[ThreadsScraper] Discovered ${results.length} unique thread URLs total`);
+      const results = Array.from(discoveredUrls.values()).slice(0, 20);
+      console.log(`[ThreadsScraper] Discovered ${results.length} unique thread URLs`);
 
       return {
         success: true,
@@ -389,19 +433,9 @@ class ThreadsScraper {
       };
     } catch (err) {
       console.error(`[ThreadsScraper] Keyword search error: ${err.message}`);
-      return {
-        success: false,
-        keywords: keywords.length,
-        threadsDiscovered: 0,
-        threads: [],
-        error: err.message
-      };
+      return { success: false, keywords: keywords.length, threadsDiscovered: 0, threads: [], error: err.message };
     } finally {
-      try {
-        await page.close().catch(() => {});
-      } catch (err) {
-        console.warn('[ThreadsScraper] Error closing page:', err.message);
-      }
+      try { await page.context().close().catch(() => {}); } catch (e) {}
     }
   }
 
