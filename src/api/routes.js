@@ -1,223 +1,580 @@
-import { Router } from 'express';
+import express from 'express';
 import Thread from '../models/Thread.js';
 import ThreadsScraper from '../services/ThreadsScraper.js';
+import CollectorEngine from '../services/CollectorEngine.js';
 
-const router = Router();
-let scraper = null;
+const router = express.Router();
 
-function getScraper() {
-  if (!scraper) scraper = new ThreadsScraper();
-  return scraper;
-}
+// Initialize collector engine singleton
+const collectorEngine = new CollectorEngine();
 
-// Helper: clean text for region detection (remove Threads UI Korean text)
+// Export engine for use in index.js scheduler
+export const engine = collectorEngine;
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Clean text for region detection
+ */
 function cleanForRegionDetect(text) {
+  if (!text) return '';
+  // Remove URLs, special UI elements
   return text
-    .replace(/번역하기/g, '')
-    .replace(/좋아요[\d,.만천]*/g, '')
-    .replace(/댓글[\d,.만천]*/g, '')
-    .replace(/리포스트[\d,.만천]*/g, '')
-    .replace(/공유하기[\d,.만천]*/g, '')
-    .replace(/인증된\s*계정/g, '')
-    .replace(/더\s*보기/g, '')
-    .replace(/팔로우/g, '')
-    .replace(/팔로워\s*[\d,.만천]+/g, '')
-    .replace(/답글\s*달기/g, '')
-    .replace(/수정됨/g, '')
-    .replace(/\d+[시일분초]간?\s*전/g, '')
-    .replace(/\d{4}-\d{2}-\d{2}/g, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[^\w\s\uAC00-\uD7AF]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-// ===== Stats =====
-router.get('/stats', async (req, res) => {
-  try {
-    const total = await Thread.countDocuments({ 'deletion.isDeleted': { $ne: true } });
-    const today = await Thread.countDocuments({
-      collectedAt: { $gte: new Date(new Date().setHours(0,0,0,0)) },
-      'deletion.isDeleted': { $ne: true }
-    });
-    const profiles = await Thread.distinct('author.username');
-    const affiliateCount = await Thread.countDocuments({ 'affiliate.hasAffiliate': true, 'deletion.isDeleted': { $ne: true } });
-    const deleted = await Thread.countDocuments({ 'deletion.isDeleted': true });
-    const domestic = await Thread.countDocuments({ region: 'domestic', 'deletion.isDeleted': { $ne: true } });
-    const overseas = await Thread.countDocuments({ region: 'overseas', 'deletion.isDeleted': { $ne: true } });
+/**
+ * Detect region based on Korean character ratio
+ */
+function detectRegion(text) {
+  if (!text) return 'unknown';
+  const koreanChars = (text.match(/[\uAC00-\uD7AF]/g) || []).length;
+  const totalChars = text.length;
+  const koreanRatio = totalChars > 0 ? (koreanChars / totalChars) * 100 : 0;
+  return koreanRatio > 10 ? 'korean' : 'overseas';
+}
 
-    const byCat = await Thread.aggregate([
-      { $match: { 'deletion.isDeleted': { $ne: true } } },
-      { $group: { _id: '$category.primary', count: { $sum: 1 } } }
-    ]);
-    const bySentiment = await Thread.aggregate([
-      { $match: { 'deletion.isDeleted': { $ne: true } } },
-      { $group: { _id: '$analysis.sentiment', count: { $sum: 1 } } }
-    ]);
+/**
+ * Classify category by keywords
+ */
+function classifyCategory(text) {
+  if (!text) return 'other';
 
-    res.json({
-      total, today, profiles: profiles.length, affiliateCount, deleted, domestic, overseas,
-      byCat: byCat.reduce((o, i) => { o[i._id] = i.count; return o; }, {}),
-      bySentiment: bySentiment.reduce((o, i) => { o[i._id] = i.count; return o; }, {}),
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+  const categoryKeywords = {
+    shopping: ['할인', '쿠폰', '핫딜', '세일', '최저가', '추천템', '리뷰', '구매', '배송', '직구', '가성비', '언박싱'],
+    issue: ['속보', '논란', '긴급', '화제', '이슈', '뉴스', '규제', '선거', '정치', '경제', '사건'],
+    personal: ['팁', '노하우', '방법', '전략', '경험', '포트폴리오', '강의', '가이드']
+  };
 
-// ===== Thread list =====
-router.get('/threads', async (req, res) => {
-  try {
-    const { category, region, search, sort = 'latest', page = 1, limit = 50, includeDeleted } = req.query;
-    const filter = {};
-    if (!includeDeleted) filter['deletion.isDeleted'] = { $ne: true };
-    if (category && category !== 'all') filter['category.primary'] = category;
-    if (region && region !== 'all') filter.region = region;
-    if (search) {
-      filter.$or = [
-        { 'content.text': { $regex: search, $options: 'i' } },
-        { 'author.username': { $regex: search, $options: 'i' } },
-        { 'content.hashtags': { $regex: search, $options: 'i' } },
-      ];
+  const lowerText = text.toLowerCase();
+
+  for (const [category, keywords] of Object.entries(categoryKeywords)) {
+    const matches = keywords.filter(keyword =>
+      lowerText.includes(keyword.toLowerCase())
+    );
+    if (matches.length > 0) {
+      return category;
     }
-    const sortMap = { latest: { collectedAt: -1 }, popular: { 'metrics.likes': -1 }, engagement: { 'metrics.engagementRate': -1 }, replies: { 'metrics.replies': -1 } };
-    const threads = await Thread.find(filter).sort(sortMap[sort] || sortMap.latest).skip((page-1)*limit).limit(Number(limit));
-    const total = await Thread.countDocuments(filter);
-    res.json({ threads, total, page: Number(page), pages: Math.ceil(total/limit) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ===== Collector status =====
-router.get('/collector/status', async (req, res) => {
-  res.json({ running: false, lastRun: null, hasToken: !!process.env.THREADS_ACCESS_TOKEN });
-});
-
-// ===== Scrape collect (FREE - no API token needed) =====
-router.post('/collector/scrape', async (req, res) => {
-  const { usernames } = req.body;
-  if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
-    return res.status(400).json({ success: false, message: '수집할 유저명 목록을 입력해주세요.' });
   }
 
-  try {
-    const sc = getScraper();
-    let totalSaved = 0;
-    const results = [];
+  return 'other';
+}
 
-    for (const username of usernames.slice(0, 5)) { // max 5 users per request
-      const clean = username.replace('@', '').trim();
-      if (!clean) continue;
+/**
+ * Detect affiliate links in content
+ */
+function detectAffiliateLinks(text, urls = []) {
+  const affiliatePatterns = {
+    coupang: [/link\.coupang\.com/i, /coupa\.ng/i],
+    aliexpress: [/ali\.ski/i, /s\.click\.aliexpress\.com/i, /aliexpress\.com/i],
+    amazon: [/amzn\.to/i, /amazon\.com\/dp/i, /tag=/i],
+    rakuten: [/a\.r10\.to/i, /rakuten/i]
+  };
 
-      console.log('[Collect] Scraping @' + clean + '...');
-      const data = await sc.scrapeProfile(clean);
-      let saved = 0;
+  const links = [];
+  let hasAffiliate = false;
 
-      for (const t of data.threads) {
-        const exists = await Thread.findOne({ threadId: String(t.threadId) });
-        if (exists) continue;
-
-        const text = t.text || '';
-        const hashtags = text.match(/#[\w\uAC00-\uD7A3]+/g) || [];
-        const mentions = text.match(/@[\w.]+/g) || [];
-        const urls = text.match(/https?:\/\/[^\s]+/g) || [];
-
-        // Region detection: clean text first to remove Threads UI Korean
-        const cleanedForRegion = cleanForRegionDetect(text);
-        const koreanCharCount = (cleanedForRegion.match(/[\uAC00-\uD7A3]/g) || []).length;
-        const totalCharCount = cleanedForRegion.replace(/\s/g, '').length;
-        // Consider Korean if >10% of chars are Korean (avoids false positives from UI remnants)
-        const isKorean = totalCharCount > 0 && (koreanCharCount / totalCharCount) > 0.1;
-
-        const hasAli = urls.some(u => /ali/i.test(u));
-        const hasCoupang = urls.some(u => /coupang/i.test(u));
-        const hasAmazon = urls.some(u => /amzn|amazon/i.test(u));
-        const hasRakuten = urls.some(u => /rakuten/i.test(u));
-        const hasAffiliate = hasAli || hasCoupang || hasAmazon || hasRakuten;
-
-        const affLinks = [];
-        if (hasAli) affLinks.push({ url: urls.find(u => /ali/i.test(u)), platform: 'aliexpress', detectedIn: 'content' });
-        if (hasCoupang) affLinks.push({ url: urls.find(u => /coupang/i.test(u)), platform: 'coupang', detectedIn: 'content' });
-        if (hasAmazon) affLinks.push({ url: urls.find(u => /amzn|amazon/i.test(u)), platform: 'amazon', detectedIn: 'content' });
-        if (hasRakuten) affLinks.push({ url: urls.find(u => /rakuten/i.test(u)), platform: 'rakuten', detectedIn: 'content' });
-
-        let catPrimary = 'personal';
-        if (hasAffiliate || /(할인|쿠폰|맥딜|세일|최저가|배송|리뷰|추천|구매)/i.test(text)) catPrimary = 'shopping';
-        else if (/(속보|논란|규제|선거|정치|경제|사회|사건|이슈|국회|법안)/i.test(text)) catPrimary = 'issue';
-
-        const mediaType = t.mediaType === 'video' ? 'video' : t.mediaType === 'carousel' ? 'carousel' : t.imageUrl ? 'image' : 'text';
-
-        await Thread.create({
-          threadId: String(t.threadId),
-          originalUrl: t.permalink || '',
-          author: {
-            username: clean,
-            displayName: data.profile?.displayName || clean,
-            profilePicUrl: data.profile?.profilePicUrl || '',
-            bio: data.profile?.bio || '',
-            isVerified: false,
-          },
-          content: {
-            text,
-            mediaType,
-            mediaUrls: t.imageUrl ? [t.imageUrl] : [],
-            thumbnailUrl: t.imageUrl || '',
-            videoUrl: t.videoUrl || '',
-            urls, hashtags, mentions,
-          },
-          category: { primary: catPrimary, sub: '', confidence: 0.7, classifiedBy: 'rule' },
-          region: isKorean ? 'domestic' : 'overseas',
-          affiliate: { hasAffiliate, links: affLinks },
-          metrics: {
-            likes: t.likeCount || 0,
-            replies: t.replyCount || 0,
-            reposts: t.repostCount || 0,
-            quotes: t.quoteCount || 0,
-            engagementRate: Math.min(100, Math.round(((t.likeCount || 0) + (t.replyCount || 0) * 3) / Math.max(1, (t.likeCount || 0)) * 30)),
-          },
-          analysis: {
-            sentiment: 'neutral',
-            keywords: hashtags.map(h => h.replace('#', '')).slice(0, 5),
-            language: isKorean ? 'ko' : 'en',
-          },
-          publishedAt: t.timestamp || new Date(),
-          collectedAt: new Date(),
-          source: 'scraper',
-        });
-        saved++;
+  // Check text
+  for (const [platform, patterns] of Object.entries(affiliatePatterns)) {
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        links.push({ url: 'inline', platform, detectedIn: 'text' });
+        hasAffiliate = true;
       }
-      totalSaved += saved;
-      results.push({ username: clean, found: data.threads.length, saved });
     }
+  }
+
+  // Check URLs
+  for (const url of urls) {
+    for (const [platform, patterns] of Object.entries(affiliatePatterns)) {
+      for (const pattern of patterns) {
+        if (pattern.test(url)) {
+          links.push({ url, platform, detectedIn: 'url' });
+          hasAffiliate = true;
+        }
+      }
+    }
+  }
+
+  return {
+    hasAffiliate,
+    links: [...new Set(links.map(l => JSON.stringify(l)))].map(l => JSON.parse(l))
+  };
+}
+
+// ============================================================================
+// STATS ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /stats - Dashboard overview
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get total count
+    const total = await Thread.countDocuments();
+
+    // Get today's count
+    const todayCount = await Thread.countDocuments({
+      collectionDate: { $gte: today }
+    });
+
+    // Get domestic vs overseas
+    const domestic = await Thread.countDocuments({ region: 'korean' });
+    const overseas = await Thread.countDocuments({ region: 'overseas' });
+
+    // Get view tier distribution
+    const viewTierDist = await Thread.aggregate([
+      {
+        $group: {
+          _id: '$viewTier',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Format view tier distribution
+    const viewTierMap = {};
+    viewTierDist.forEach(tier => {
+      viewTierMap[tier._id || 'unknown'] = tier.count;
+    });
+
+    // Get by category
+    const byCategory = await Thread.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const categoryMap = {};
+    byCategory.forEach(cat => {
+      categoryMap[cat._id || 'other'] = cat.count;
+    });
+
+    // Get affiliate count
+    const affiliateCount = await Thread.countDocuments({ hasAffiliate: true });
+
+    res.json({
+      total,
+      today: todayCount,
+      domestic,
+      overseas,
+      affiliate: affiliateCount,
+      viewTierDist: viewTierMap,
+      byCat: categoryMap,
+      autoCollectStatus: collectorEngine.getStatus()
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// THREADS ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /threads - List threads with filters
+ */
+router.get('/threads', async (req, res) => {
+  try {
+    const {
+      category = 'all',
+      region = 'all',
+      viewTier = 'all',
+      search = '',
+      sort = 'latest',
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    // Build filter
+    const filter = {};
+
+    if (category !== 'all') {
+      filter.category = category;
+    }
+
+    if (region !== 'all') {
+      filter.region = region;
+    }
+
+    if (viewTier !== 'all') {
+      filter.viewTier = viewTier;
+    }
+
+    if (search) {
+      filter.$or = [
+        { text: { $regex: search, $options: 'i' } },
+        { author: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Build sort
+    let sortObj = { createdAt: -1 };
+    if (sort === 'popular') {
+      sortObj = { likeCount: -1, createdAt: -1 };
+    } else if (sort === 'engagement') {
+      sortObj = {
+        $expr: {
+          $add: ['$replyCount', '$likeCount', '$shareCount']
+        }
+      };
+    } else if (sort === 'views') {
+      sortObj = { viewCount: -1, createdAt: -1 };
+    } else if (sort === 'replies') {
+      sortObj = { replyCount: -1, createdAt: -1 };
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Execute query
+    const threads = await Thread.find(filter)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get total count for pagination
+    const total = await Thread.countDocuments(filter);
+
+    res.json({
+      data: threads,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching threads:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// COLLECTOR ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /collector/scrape - Manual scrape by usernames
+ */
+router.post('/collector/scrape', async (req, res) => {
+  try {
+    const { usernames } = req.body;
+
+    if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
+      return res.status(400).json({ error: 'usernames array required' });
+    }
+
+    const scraper = new ThreadsScraper();
+    const results = { success: 0, failed: 0, threads: [] };
+
+    for (const username of usernames) {
+      try {
+        const threadUrls = await scraper.scrapeProfileThreads(username);
+
+        for (const url of threadUrls) {
+          try {
+            const threadData = await scraper.scrapeThreadDetail(url);
+            const comments = await scraper.scrapeComments(url);
+
+            // Clean and process
+            const cleanText = cleanForRegionDetect(threadData.text);
+            const region = detectRegion(cleanText);
+            const category = classifyCategory(cleanText);
+            const viewTier = Thread.calcViewTier(threadData.viewCount || 0);
+            const affiliateInfo = detectAffiliateLinks(cleanText, threadData.urls || []);
+
+            // Check for duplicate
+            const existing = await Thread.findOne({ threadId: threadData.threadId });
+            if (existing) {
+              continue;
+            }
+
+            // Save thread
+            const threadDoc = new Thread({
+              threadId: threadData.threadId,
+              author: threadData.author,
+              username: username,
+              text: cleanText,
+              urls: threadData.urls || [],
+              viewCount: threadData.viewCount || 0,
+              replyCount: threadData.replyCount || 0,
+              likeCount: threadData.likeCount || 0,
+              shareCount: threadData.shareCount || 0,
+              createdAt: threadData.createdAt || new Date(),
+              region: region,
+              category: category,
+              viewTier: viewTier,
+              hasAffiliate: affiliateInfo.hasAffiliate,
+              affiliateLinks: affiliateInfo.links,
+              collectionSource: 'manual',
+              collectionDate: new Date(),
+              comments: comments
+            });
+
+            await threadDoc.save();
+            results.success++;
+            results.threads.push({
+              threadId: threadDoc.threadId,
+              author: threadDoc.author,
+              category: threadDoc.category
+            });
+          } catch (error) {
+            console.error(`Error processing thread ${url}:`, error);
+            results.failed++;
+          }
+        }
+      } catch (error) {
+        console.error(`Error scraping profile ${username}:`, error);
+        results.failed++;
+      }
+    }
+
+    res.json({
+      success: results.success > 0,
+      data: results
+    });
+  } catch (error) {
+    console.error('Error in manual scrape:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /collector/auto-run - Trigger auto collection manually
+ */
+router.post('/collector/auto-run', async (req, res) => {
+  try {
+    const result = await collectorEngine.runAutoCollection();
+    res.json(result);
+  } catch (error) {
+    console.error('Error in auto-run:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /collector/status - Auto collection engine status
+ */
+router.get('/collector/status', (req, res) => {
+  try {
+    const status = collectorEngine.getStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error fetching status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /collector/profiles - Add profile to auto-track list
+ */
+router.post('/collector/profiles', async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'username required' });
+    }
+
+    const result = await collectorEngine.addTrackedProfile(username);
+    res.json(result);
+  } catch (error) {
+    console.error('Error adding profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /collector/profiles - List tracked profiles
+ */
+router.get('/collector/profiles', async (req, res) => {
+  try {
+    const profiles = await collectorEngine.getTrackedProfiles();
+    res.json({ data: profiles });
+  } catch (error) {
+    console.error('Error fetching profiles:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /collector/profiles/:username - Remove profile from tracking
+ */
+router.delete('/collector/profiles/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const result = await collectorEngine.removeTrackedProfile(username);
+    res.json(result);
+  } catch (error) {
+    console.error('Error removing profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SEED ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /seed-demo - Seed demo data
+ */
+router.post('/seed-demo', async (req, res) => {
+  try {
+    const demoThreads = [
+      {
+        threadId: 'demo-001',
+        author: 'Demo User 1',
+        username: 'demouser1',
+        text: '쿠팡 핫딜 세일 지금 바로 최저가로 구매하세요. 배송 빠릅니다!',
+        urls: ['https://link.coupang.com/demo'],
+        viewCount: 2500,
+        replyCount: 45,
+        likeCount: 120,
+        shareCount: 30,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        region: 'korean',
+        category: 'shopping',
+        viewTier: '1k',
+        hasAffiliate: true,
+        affiliateLinks: [{ url: 'https://link.coupang.com/demo', platform: 'coupang', detectedIn: 'url' }],
+        collectionSource: 'demo',
+        collectionDate: new Date(),
+        comments: []
+      },
+      {
+        threadId: 'demo-002',
+        author: 'Demo User 2',
+        username: 'demouser2',
+        text: '아마존 직구 후기 공유합니다. 가성비 정말 좋네요!',
+        urls: ['https://amzn.to/demo'],
+        viewCount: 8750,
+        replyCount: 156,
+        likeCount: 450,
+        shareCount: 85,
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+        region: 'korean',
+        category: 'shopping',
+        viewTier: '5k',
+        hasAffiliate: true,
+        affiliateLinks: [{ url: 'https://amzn.to/demo', platform: 'amazon', detectedIn: 'url' }],
+        collectionSource: 'demo',
+        collectionDate: new Date(),
+        comments: []
+      },
+      {
+        threadId: 'demo-003',
+        author: 'Demo User 3',
+        username: 'demouser3',
+        text: '속보) 새로운 정책 발표 관련 이슈 정리했습니다.',
+        urls: [],
+        viewCount: 45000,
+        replyCount: 520,
+        likeCount: 1200,
+        shareCount: 340,
+        createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        region: 'korean',
+        category: 'issue',
+        viewTier: '10k',
+        hasAffiliate: false,
+        affiliateLinks: [],
+        collectionSource: 'demo',
+        collectionDate: new Date(),
+        comments: []
+      },
+      {
+        threadId: 'demo-004',
+        author: 'Demo User 4',
+        username: 'demouser4',
+        text: '개인적인 팁: 생산성 높이는 방법들을 공유합니다.',
+        urls: [],
+        viewCount: 15600,
+        replyCount: 234,
+        likeCount: 680,
+        shareCount: 120,
+        createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+        region: 'korean',
+        category: 'personal',
+        viewTier: '10k',
+        hasAffiliate: false,
+        affiliateLinks: [],
+        collectionSource: 'demo',
+        collectionDate: new Date(),
+        comments: []
+      },
+      {
+        threadId: 'demo-005',
+        author: 'Demo User 5',
+        username: 'demouser5',
+        text: 'Check out this amazing tech review from overseas.',
+        urls: [],
+        viewCount: 5200,
+        replyCount: 89,
+        likeCount: 210,
+        shareCount: 45,
+        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
+        region: 'overseas',
+        category: 'other',
+        viewTier: '5k',
+        hasAffiliate: false,
+        affiliateLinks: [],
+        collectionSource: 'demo',
+        collectionDate: new Date(),
+        comments: []
+      }
+    ];
+
+    // Clear existing demo data
+    await Thread.deleteMany({ collectionSource: 'demo' });
+
+    // Insert demo threads
+    const inserted = await Thread.insertMany(demoThreads);
 
     res.json({
       success: true,
-      message: totalSaved + '개 스레드 수집 완료',
-      total: totalSaved,
-      details: results
+      message: `Seeded ${inserted.length} demo threads`,
+      data: inserted
     });
-  } catch (e) {
-    console.error('[Collect] Error:', e);
-    res.status(500).json({ success: false, message: '수집 오류: ' + e.message });
+  } catch (error) {
+    console.error('Error seeding demo data:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// ===== Seed demo data =====
-router.post('/seed-demo', async (req, res) => {
+/**
+ * DELETE /threads/all - Clear all threads
+ */
+router.delete('/threads/all', async (req, res) => {
   try {
-    await Thread.deleteMany({});
-    const now = new Date();
-    const ago = (m) => new Date(now - m * 60000);
-    const threads = [
-      { threadId: 'demo_kr_shop_1', author: { username: 'coupang_picks', displayName: '쿠팡추천마니아', profilePicUrl: 'https://picsum.photos/seed/cp1/100', followerCount: 45000, isVerified: true }, content: { text: '🎁 쿠팡 로켓배송 오늘의 핫딜 TOP5 #쿠팡 #핫딜 #로켓배송', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/shop1/600/400','https://picsum.photos/seed/shop1b/600/400'], thumbnailUrl: 'https://picsum.photos/seed/shop1/600/400', urls: ['https://link.coupang.com/xyz789'], hashtags: ['#쿠팡','#핫딜'] }, category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.95, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/xyz789', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 1890, replies: 312, reposts: 445, engagementRate: 88 }, analysis: { sentiment: 'positive', keywords: ['쿠팡','핫딜'], language: 'ko' }, publishedAt: ago(120), source: 'scraper' },
-      { threadId: 'demo_kr_shop_2', author: { username: 'beauty_haul_kr', displayName: '뷰티하울', profilePicUrl: 'https://picsum.photos/seed/bh1/100', followerCount: 23000 }, content: { text: '💄 올리브영 립오일 50% 할인! #올리브영 #뷰티딜', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/beauty1/600/400', videoUrl: 'https://example.com/v1.mp4', urls: ['https://link.coupang.com/beauty01'], hashtags: ['#올리브영'] }, category: { primary: 'shopping', sub: '쿠팡파트너스', confidence: 0.92, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/beauty01', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 3400, replies: 567, reposts: 234, engagementRate: 91 }, analysis: { sentiment: 'positive', keywords: ['올리브영','할인'], language: 'ko' }, publishedAt: ago(90), source: 'scraper' },
-      { threadId: 'demo_os_shop_1', author: { username: 'deal_hunter_kr', displayName: '딜헌터KR', profilePicUrl: 'https://picsum.photos/seed/dh1/100', followerCount: 18000 }, content: { text: '🔥 알리 역대급 할인! 에어팟맥스 케이스 $2.99 #알리익스프레스 #할인', mediaType: 'image', thumbnailUrl: 'https://picsum.photos/seed/ali1/600/400', urls: ['https://ali.ski/abc123'], hashtags: ['#알리익스프레스'] }, category: { primary: 'shopping', sub: 'AliExpress', confidence: 0.95, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: true, links: [{ url: 'https://ali.ski/abc123', platform: 'aliexpress', detectedIn: 'content' }] }, metrics: { likes: 2340, replies: 189, reposts: 567, engagementRate: 94 }, analysis: { sentiment: 'positive', keywords: ['알리','할인'], language: 'ko' }, publishedAt: ago(60), source: 'scraper' },
-      { threadId: 'demo_os_shop_2', author: { username: 'us_deal_master', displayName: '미국직구마스터', profilePicUrl: 'https://picsum.photos/seed/us1/100', followerCount: 32000, isVerified: true }, content: { text: '🇺🇸 아마존 프라임데이 사전할인! 갤럭시 버즈3 프로 최저가 #아마존 #프라임데이', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/amz1/600/400', videoUrl: 'https://example.com/v2.mp4', urls: ['https://amzn.to/def456'], hashtags: ['#아마존'] }, category: { primary: 'shopping', sub: 'Amazon', confidence: 0.96, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: true, links: [{ url: 'https://amzn.to/def456', platform: 'amazon', detectedIn: 'content' }] }, metrics: { likes: 3210, replies: 456, reposts: 789, engagementRate: 97 }, analysis: { sentiment: 'positive', keywords: ['아마존','프라임데이'], language: 'ko' }, publishedAt: ago(180), source: 'scraper' },
-      { threadId: 'demo_kr_issue_1', author: { username: 'ent_news_live', displayName: '연예뉴스라이브', profilePicUrl: 'https://picsum.photos/seed/ent1/100', followerCount: 120000, isVerified: true }, content: { text: '🎤 속보: BTS 지민 솔로 월드투어 일정 공개! #BTS #지민 #월드투어', mediaType: 'image', thumbnailUrl: 'https://picsum.photos/seed/bts1/600/400', hashtags: ['#BTS','#지민'] }, category: { primary: 'issue', sub: '연예', confidence: 0.97, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 45200, replies: 8900, reposts: 12300, engagementRate: 99 }, analysis: { sentiment: 'positive', keywords: ['BTS','지민','월드투어'], language: 'ko' }, publishedAt: ago(20), source: 'scraper' },
-      { threadId: 'demo_kr_issue_2', author: { username: 'politics_watch', displayName: '정치워치', profilePicUrl: 'https://picsum.photos/seed/pol1/100', followerCount: 67000, isVerified: true }, content: { text: '🏛️ 국회 AI 규제법안 본회의 통과 #AI규제 #국회', mediaType: 'text', hashtags: ['#AI규제'] }, category: { primary: 'issue', sub: '시사', confidence: 0.94, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 8900, replies: 2340, reposts: 3400, engagementRate: 85 }, analysis: { sentiment: 'neutral', keywords: ['AI규제','국회'], language: 'ko' }, publishedAt: ago(100), source: 'scraper' },
-      { threadId: 'demo_kr_issue_3', author: { username: 'sports_flash', displayName: '스포츠플래시', profilePicUrl: 'https://picsum.photos/seed/sp1/100', followerCount: 89000, isVerified: true }, content: { text: '⚽ 손흥민 시즌 20호골! EPL 득점왕 경쟁 본격화 #손흥민 #EPL', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/son1/600/400', videoUrl: 'https://example.com/son.mp4', hashtags: ['#손흥민','#EPL'] }, category: { primary: 'issue', sub: '스포츠', confidence: 0.96, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 34500, replies: 5600, reposts: 8900, engagementRate: 96 }, analysis: { sentiment: 'positive', keywords: ['손흥민','EPL'], language: 'ko' }, publishedAt: ago(30), source: 'scraper' },
-      { threadId: 'demo_os_issue_1', author: { username: 'tech_insider_kr', displayName: '테크인사이더', profilePicUrl: 'https://picsum.photos/seed/tech1/100', followerCount: 95000, isVerified: true }, content: { text: '💻 OpenAI GPT-5 출시 임박설 #OpenAI #GPT5 #AI', mediaType: 'video', thumbnailUrl: 'https://picsum.photos/seed/gpt1/600/400', videoUrl: 'https://example.com/gpt5.mp4', hashtags: ['#OpenAI','#GPT5','#AI'] }, category: { primary: 'issue', sub: 'IT/테크', confidence: 0.95, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 12400, replies: 3200, reposts: 5600, engagementRate: 92 }, analysis: { sentiment: 'positive', keywords: ['OpenAI','GPT5','AI'], language: 'ko' }, publishedAt: ago(200), source: 'scraper' },
-      { threadId: 'demo_kr_personal_1', author: { username: 'growth_hacker_jin', displayName: '그로스해커진', profilePicUrl: 'https://picsum.photos/seed/gh1/100', followerCount: 28000 }, content: { text: '🚀 스레드 알고리즘 분석! 도달률 300% 올리는 5가지 팁 #마케팅 #스레드', mediaType: 'carousel', mediaUrls: ['https://picsum.photos/seed/mk1/600/400','https://picsum.photos/seed/mk2/600/400'], thumbnailUrl: 'https://picsum.photos/seed/mk1/600/400', hashtags: ['#마케팅','#스레드'] }, category: { primary: 'personal', sub: '마케팅', confidence: 0.91, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 6700, replies: 890, reposts: 2300, engagementRate: 91 }, analysis: { sentiment: 'positive', keywords: ['스레드','알고리즘'], language: 'ko' }, publishedAt: ago(35), source: 'scraper' },
-      { threadId: 'demo_os_personal_1', author: { username: 'warren_kr', displayName: '한국의워렌', profilePicUrl: 'https://picsum.photos/seed/wr1/100', followerCount: 41000 }, content: { text: '📈 2026년 포트폴리오 리밸런싱 전략 #투자 #포트폴리오 #반도체', mediaType: 'image', thumbnailUrl: 'https://picsum.photos/seed/inv1/600/400', hashtags: ['#투자','#반도체'] }, category: { primary: 'personal', sub: '투자', confidence: 0.88, classifiedBy: 'rule' }, region: 'overseas', affiliate: { hasAffiliate: false, links: [] }, metrics: { likes: 9800, replies: 1560, reposts: 3400, engagementRate: 89 }, analysis: { sentiment: 'neutral', keywords: ['투자','반도체'], language: 'ko' }, publishedAt: ago(170), source: 'scraper' },
-      { threadId: 'demo_deleted_1', author: { username: 'deleted_user123', displayName: '삭제된유저' }, content: { text: '삭제된 게시물. 원본: 쿠팡 할인코드 공유 #할인코드', mediaType: 'text', urls: ['https://link.coupang.com/del001'], hashtags: ['#할인코드'] }, category: { primary: 'shopping', sub: '쿠팡', confidence: 0.8, classifiedBy: 'rule' }, region: 'domestic', affiliate: { hasAffiliate: true, links: [{ url: 'https://link.coupang.com/del001', platform: 'coupang', detectedIn: 'content' }] }, metrics: { likes: 340, replies: 23, reposts: 12, engagementRate: 45 }, analysis: { sentiment: 'positive', keywords: ['쿠팡'], language: 'ko' }, deletion: { isDeleted: true, deletedAt: ago(30), detectedAt: ago(25), reason: 'user_deleted' }, publishedAt: ago(300), source: 'scraper' },
-    ];
-    await Thread.insertMany(threads);
-    res.json({ success: true, message: threads.length + '개 데모 스레드 추가', total: threads.length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const result = await Thread.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} threads`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting threads:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;
