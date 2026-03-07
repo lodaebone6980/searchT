@@ -61,7 +61,8 @@ class CollectorEngine {
         for (const keyword of keywords) {
           try {
             this.logEvent(`Searching keyword: ${keyword}`, 'info');
-            const threadUrls = await this.scraper.scrapeKeywords([keyword]);
+            const _kwResult = await this.scraper.scrapeKeywords([keyword]);
+          const threadUrls = (_kwResult && _kwResult.threads) ? _kwResult.threads.map(t => t.url || t) : [];
 
             for (const url of threadUrls) {
               try {
@@ -127,7 +128,8 @@ class CollectorEngine {
       for (const username of usernames) {
         try {
           this.logEvent(`Scraping profile: ${username}`, 'info');
-          const threadUrls = await this.scraper.scrapeProfile(username);
+          const _profResult = await this.scraper.scrapeProfile(username);
+          const threadUrls = (_profResult && _profResult.threads) ? _profResult.threads.map(t => t.url || t) : [];
 
           for (const url of threadUrls) {
             try {
@@ -170,7 +172,8 @@ class CollectorEngine {
       for (const username of usernames) {
         try {
           this.logEvent(`Manual collection from: ${username}`, 'info');
-          const threadUrls = await this.scraper.scrapeProfile(username);
+          const _profResult = await this.scraper.scrapeProfile(username);
+          const threadUrls = (_profResult && _profResult.threads) ? _profResult.threads.map(t => t.url || t) : [];
 
           for (const url of threadUrls) {
             try {
