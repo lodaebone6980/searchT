@@ -56,34 +56,33 @@ class CollectorEngine {
     try {
       this.logEvent('Auto collection started', 'info');
 
-      // Phase 1: Keyword-based discovery
+      // Phase 1: Keyword-based discovery (batch per category)
       for (const [category, keywords] of Object.entries(this.discoveryKeywords)) {
-        for (const keyword of keywords) {
-          try {
-            this.logEvent(`Searching keyword: ${keyword}`, 'info');
-            const _kwResult = await this.scraper.scrapeKeywords([keyword]);
+        try {
+          this.logEvent(`Searching category: ${category} (${keywords.length} keywords)`, 'info');
+          const _kwResult = await this.scraper.scrapeKeywords(keywords);
           const threadUrls = (_kwResult && _kwResult.threads) ? _kwResult.threads.map(t => t.url || t) : [];
+          this.logEvent(`Found ${threadUrls.length} threads for category: ${category}`, 'info');
 
-            for (const url of threadUrls) {
-              try {
-                const threadData = await this.scraper.scrapeThreadDetail(url);
-                const comments = await this.scraper.scrapeComments(url);
-                await this.processAndSaveThread(threadData, 'auto_keyword', null, comments);
-                this.stats.totalKeyword++;
-              } catch (error) {
-                this.logEvent(`Error scraping URL ${url}: ${error.message}`, 'error');
-                this.stats.errors++;
-              }
+          for (const url of threadUrls) {
+            try {
+              const threadData = await this.scraper.scrapeThreadDetail(url);
+              const comments = await this.scraper.scrapeComments(url);
+              await this.processAndSaveThread(threadData, 'auto_keyword', null, comments);
+              this.stats.totalKeyword++;
+            } catch (error) {
+              this.logEvent(`Error scraping URL ${url}: ${error.message}`, 'error');
+              this.stats.errors++;
             }
-          // Delay between keywords to prevent OOM
-            await new Promise(r => setTimeout(r, 2000));
-          } catch (error) {
-            this.logEvent(`Error searching keyword ${keyword}: ${error.message}`, 'error');
-            this.stats.errors++;
-            // Browser crashed - force restart
-            try { await this.scraper.close(); } catch(e) {}
           }
+        } catch (error) {
+          this.logEvent(`Error in category ${category}: ${error.message}`, 'error');
+          this.stats.errors++;
+          // Browser may have crashed - force restart
+          try { await this.scraper.close(); } catch(e) {}
         }
+        // Delay between categories
+        await new Promise(r => setTimeout(r, 3000));
       }
 
       // Phase 2: Profile-based collection (if profiles registered)
