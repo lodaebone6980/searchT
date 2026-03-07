@@ -20,16 +20,16 @@ class CollectorEngine {
 
     // Discovery keywords grouped by category
     this.discoveryKeywords = {
-      shopping: ['쿠팡 할인', '핫딜 추천', '알리 할인', '아마존 직구', '쇼핑 추천', '링크 할인'],
-      issue: ['속보', '논란', '화제 실시간', '이슈 정리', 'breaking news'],
-      personal: ['팁 공유', '노하우', '포트폴리오 공개']
+      shopping: ['ì¿ í¡ í ì¸', 'í«ë ì¶ì²', 'ìë¦¬ í ì¸', 'ìë§ì¡´ ì§êµ¬', 'ì¼í ì¶ì²', 'ë§í¬ í ì¸'],
+      issue: ['ìë³´', 'ë¼ë', 'íì  ì¤ìê°', 'ì´ì ì ë¦¬', 'breaking news'],
+      personal: ['í ê³µì ', 'ë¸íì°', 'í¬í¸í´ë¦¬ì¤ ê³µê°']
     };
 
     // Category keywords for classification
     this.categoryKeywords = {
-      shopping: ['할인', '쿠폰', '핫딜', '세일', '최저가', '추천템', '리뷰', '구매', '배송', '직구', '가성비', '언박싱'],
-      issue: ['속보', '논란', '긴급', '화제', '이슈', '뉴스', '규제', '선거', '정치', '경제', '사건'],
-      personal: ['팁', '노하우', '방법', '전략', '경험', '포트폴리오', '강의', '가이드']
+      shopping: ['í ì¸', 'ì¿ í°', 'í«ë', 'ì¸ì¼', 'ìµì ê°', 'ì¶ì²í', 'ë¦¬ë·°', 'êµ¬ë§¤', 'ë°°ì¡', 'ì§êµ¬', 'ê°ì±ë¹', 'ì¸ë°ì±'],
+      issue: ['ìë³´', 'ë¼ë', 'ê¸´ê¸', 'íì ', 'ì´ì', 'ë´ì¤', 'ê·ì ', 'ì ê±°', 'ì ì¹', 'ê²½ì ', 'ì¬ê±´'],
+      personal: ['í', 'ë¸íì°', 'ë°©ë²', 'ì ëµ', 'ê²½í', 'í¬í¸í´ë¦¬ì¤', 'ê°ì', 'ê°ì´ë']
     };
 
     // Affiliate patterns
@@ -42,7 +42,7 @@ class CollectorEngine {
   }
 
   /**
-   * Full auto collection cycle: keyword search → profile scrape → save to DB
+   * Full auto collection cycle: keyword search â profile scrape â save to DB
    */
   async runAutoCollection() {
     if (this.isRunning) {
@@ -61,7 +61,7 @@ class CollectorEngine {
         for (const keyword of keywords) {
           try {
             this.logEvent(`Searching keyword: ${keyword}`, 'info');
-            const threadUrls = await this.scraper.scrapeKeywords(keyword);
+            const threadUrls = await this.scraper.scrapeKeywords([keyword]);
 
             for (const url of threadUrls) {
               try {
