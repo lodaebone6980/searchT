@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ThreadsCollector - Meta Threads Ã«Â¹â¦Ã«ÂÂ°Ã¬ÂÂ´Ã­âÂ° Ã¬ËËÃ¬Â§â & Ã«Â¶âÃ¬âÂ Ã­âÅÃ«Å¾Â«Ã­ÂÂ¼</title>
+    <title>ThreadsCollector - Meta Threads 빅데이터 수집 & 분석 플랫폼</title>
     <style>
         * {
             margin: 0;
@@ -855,54 +855,54 @@
         <!-- Header -->
         <div class="header">
             <div class="logo-section">
-                <div class="logo">Ã°Å¸Â§Âµ</div>
+                <div class="logo">🧵</div>
                 <div class="logo-text">
                     <h1>ThreadsCollector</h1>
-                    <p>Meta Threads Ã«Â¹â¦Ã«ÂÂ°Ã¬ÂÂ´Ã­âÂ° Ã¬ËËÃ¬Â§â & Ã«Â¶âÃ¬âÂ Ã­âÅÃ«Å¾Â«Ã­ÂÂ¼</p>
+                    <p>Meta Threads 빅데이터 수집 & 분석 플랫폼</p>
                 </div>
             </div>
             <div class="header-right">
                 <div class="status-badge">
                     <div class="status-dot"></div>
-                    <span id="statusText">Ã¬â¹Â¤Ã¬â¹ÅÃªÂ°â Ã¬ËËÃ¬Â§â Ã­â¢ÅÃ¬âÂ±</span>
+                    <span id="statusText">실시간 수집 활성</span>
                 </div>
-                <span style="font-size: 12px; color: #9ca3af;" id="lastCollectionTime">Ã«Â§ËÃ¬Â§â¬Ã«Â§â° Ã¬ËËÃ¬Â§â: Ã«Â°Â©ÃªÂ¸Ë Ã¬Â â</span>
-                <button class="btn btn-primary" onclick="openScrapeModal()">Ã¬ËËÃ¬Â§âÃ­â¢ËÃªÂ¸Â°</button>
+                <span style="font-size: 12px; color: #9ca3af;" id="lastCollectionTime">마지막 수집: 방금 전</span>
+                <button class="btn btn-primary" onclick="openScrapeModal()">수집하기</button>
             </div>
         </div>
 
         <!-- Stats Row -->
         <div class="stats-row">
             <div class="stat-card">
-                <div class="stat-label">Ã°Å¸âÅ  Ã¬Â´Â Ã¬ËËÃ¬Â§â Ã¬Å Â¤Ã«Â ËÃ«âÅ</div>
+                <div class="stat-label">📊 총 수집 스레드</div>
                 <div class="stat-value" id="totalThreads">0</div>
-                <div class="stat-change">Ã¢â â 1.2% Ã¬Â¦ÂÃªÂ°â¬</div>
+                <div class="stat-change">↑ 1.2% 증가</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Ã°Å¸ââ¦ Ã¬ËÂ¤Ã«Å Ë Ã¬ËËÃ¬Â§â</div>
+                <div class="stat-label">📅 오늘 수집</div>
                 <div class="stat-value" id="todayThreads">0</div>
-                <div class="stat-change">Ã¢â â 2.8% Ã¬Â¦ÂÃªÂ°â¬</div>
+                <div class="stat-change">↑ 2.8% 증가</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Ã°Å¸â¡Â°Ã°Å¸â¡Â· ÃªÂµÂ­Ã«âÂ´ Ã¬Å Â¤Ã«Â ËÃ«âÅ</div>
+                <div class="stat-label">🇰🇷 국내 스레드</div>
                 <div class="stat-value" id="domesticThreads">0</div>
-                <div class="stat-change">Ã¢â â 0.5% Ã¬Â¦ÂÃªÂ°â¬</div>
+                <div class="stat-change">↑ 0.5% 증가</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Ã°Å¸ÅÂ Ã­â¢Â´Ã¬â¢Â¸ Ã¬Å Â¤Ã«Â ËÃ«âÅ</div>
+                <div class="stat-label">🌐 해외 스레드</div>
                 <div class="stat-value" id="overseasThreads">0</div>
-                <div class="stat-change">Ã¢â â 3.2% Ã¬Â¦ÂÃªÂ°â¬</div>
+                <div class="stat-change">↑ 3.2% 증가</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Ã°Å¸ââ Ã¬Â ÅÃ­ÅÂ´ Ã«Â§ÂÃ­ÂÂ¬ ÃªÂ°ÂÃ¬Â§â¬</div>
+                <div class="stat-label">🔗 제휴 링크 감지</div>
                 <div class="stat-value" id="affiliateCount">0</div>
-                <div class="stat-change">Ã¢â â 5.1% Ã¬Â¦ÂÃªÂ°â¬</div>
+                <div class="stat-change">↑ 5.1% 증가</div>
             </div>
         </div>
 
         <!-- Tier Distribution Bar -->
         <div class="tier-bar-section">
-            <div class="tier-bar-title">Ã¬Â¡Â°Ã­Å¡ÅÃ¬ËË Ã­â¹Â°Ã¬âÂ´ Ã«Â¶âÃ­ÂÂ¬</div>
+            <div class="tier-bar-title">조회수 티어 분포</div>
             <div class="tier-bar-container" id="tierBarContainer"></div>
             <div class="tier-legend" id="tierLegend"></div>
         </div>
@@ -911,43 +911,43 @@
         <div class="filter-bar">
             <div class="filter-row">
                 <div class="filter-group">
-                    <span class="filter-label">Ã¬Â¹Â´Ã­â¦ÅÃªÂ³Â Ã«Â¦Â¬</span>
-                    <button class="filter-btn active" onclick="setCategory('all')">Ã¬Â âÃ¬Â²Â´</button>
-                    <button class="filter-btn" onclick="setCategory('shopping')">Ã°Å¸âºâ Ã¬â¡Â¼Ã­â¢â</button>
-                    <button class="filter-btn" onclick="setCategory('issue')">Ã°Å¸âÂ° Ã¬ÂÂ´Ã¬Å Ë</button>
-                    <button class="filter-btn" onclick="setCategory('personal')">Ã°Å¸âÂ¤ Ã­ÂÂ¼Ã¬Å Â¤Ã«âÂ</button>
+                    <span class="filter-label">카테고리</span>
+                    <button class="filter-btn active" onclick="setCategory('all')">전체</button>
+                    <button class="filter-btn" onclick="setCategory('shopping')">🛒 쇼핑</button>
+                    <button class="filter-btn" onclick="setCategory('issue')">📰 이슈</button>
+                    <button class="filter-btn" onclick="setCategory('personal')">👤 퍼스널</button>
                 </div>
             </div>
             <div class="filter-row">
                 <div class="filter-group">
-                    <span class="filter-label">Ã¬Â§â¬Ã¬âÂ­</span>
-                    <button class="filter-btn active" onclick="setRegion('all')">Ã¬Â âÃ¬Â²Â´</button>
-                    <button class="filter-btn" onclick="setRegion('domestic')">Ã°Å¸â¡Â°Ã°Å¸â¡Â· ÃªÂµÂ­Ã«âÂ´</button>
-                    <button class="filter-btn" onclick="setRegion('overseas')">Ã°Å¸ÅÂ Ã­â¢Â´Ã¬â¢Â¸</button>
+                    <span class="filter-label">지역</span>
+                    <button class="filter-btn active" onclick="setRegion('all')">전체</button>
+                    <button class="filter-btn" onclick="setRegion('domestic')">🇰🇷 국내</button>
+                    <button class="filter-btn" onclick="setRegion('overseas')">🌐 해외</button>
                 </div>
             </div>
             <div class="filter-row">
                 <div class="filter-group">
-                    <span class="filter-label">Ã­â¹Â°Ã¬âÂ´</span>
+                    <span class="filter-label">티어</span>
                     <select class="filter-select" id="tierFilter" onchange="setViewTier(this.value)">
-                        <option value="all">Ã¬Â âÃ¬Â²Â´</option>
+                        <option value="all">전체</option>
                         <option value="1k">1K+</option>
                         <option value="5k">5K+</option>
-                        <option value="10k">1Ã«Â§Å+</option>
-                        <option value="50k">5Ã«Â§Å+</option>
-                        <option value="100k">10Ã«Â§Å+</option>
+                        <option value="10k">1만+</option>
+                        <option value="50k">5만+</option>
+                        <option value="100k">10만+</option>
                     </select>
                 </div>
                 <div class="filter-group" style="flex: 1;">
-                    <input type="text" class="filter-input" id="searchInput" placeholder="Ã­âÂ¤Ã¬âºÅÃ«âÅ Ã«ËÂÃ«Å â Ã¬âÂ¬Ã¬Å¡Â©Ã¬Å¾ÂÃ«Âªâ¦ ÃªÂ²â¬Ã¬Æâ°..." onkeyup="debounceSearch()">
+                    <input type="text" class="filter-input" id="searchInput" placeholder="키워드 또는 사용자명 검색..." onkeyup="debounceSearch()">
                 </div>
                 <div class="filter-group">
-                    <span class="filter-label">Ã¬Â â¢Ã«Â Â¬</span>
+                    <span class="filter-label">정렬</span>
                     <select class="filter-select" id="sortFilter" onchange="setSort(this.value)">
-                        <option value="latest">Ã¬ÂµÅÃ¬â¹Â Ã¬ËÅ</option>
-                        <option value="popular">Ã¬ÂÂ¸ÃªÂ¸Â°Ã¬ËÅ</option>
-                        <option value="views">Ã¬Â¡Â°Ã­Å¡ÅÃ¬ËÅ</option>
-                        <option value="replies">Ã«ÅâÃªÂ¸â¬Ã¬ËÅ</option>
+                        <option value="latest">최신순</option>
+                        <option value="popular">인기순</option>
+                        <option value="views">조회순</option>
+                        <option value="replies">댓글순</option>
                     </select>
                 </div>
             </div>
@@ -962,57 +962,57 @@
             <div class="sidebar">
                 <!-- Category Distribution -->
                 <div class="sidebar-card">
-                    <div class="sidebar-title">Ã°Å¸âÅ  Ã¬Â¹Â´Ã­â¦ÅÃªÂ³Â Ã«Â¦Â¬ Ã«Â¶âÃ­ÂÂ¬</div>
+                    <div class="sidebar-title">📊 카테고리 분포</div>
                     <div id="categoryChart"></div>
                 </div>
 
                 <!-- Region Distribution -->
                 <div class="sidebar-card">
-                    <div class="sidebar-title">Ã°Å¸âÂ ÃªÂµÂ­Ã«âÂ´/Ã­â¢Â´Ã¬â¢Â¸ Ã«Â¶âÃ­ÂÂ¬</div>
+                    <div class="sidebar-title">📍 국내/해외 분포</div>
                     <div class="region-cards">
                         <div class="region-card domestic">
                             <div class="region-value" id="sidebarDomestic">0</div>
-                            <div class="region-label">ÃªÂµÂ­Ã«âÂ´</div>
+                            <div class="region-label">국내</div>
                         </div>
                         <div class="region-card overseas">
                             <div class="region-value" id="sidebarOverseas">0</div>
-                            <div class="region-label">Ã­â¢Â´Ã¬â¢Â¸</div>
+                            <div class="region-label">해외</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- View Tier Distribution -->
                 <div class="sidebar-card">
-                    <div class="sidebar-title">Ã°Å¸âÂÃ¯Â¸Â Ã¬Â¡Â°Ã­Å¡ÅÃ¬ËË Ã«Â¶âÃ­ÂÂ¬</div>
+                    <div class="sidebar-title">👁️ 조회수 분포</div>
                     <div id="tierChart"></div>
                 </div>
 
                 <!-- Auto Collect Status -->
                 <div class="sidebar-card">
-                    <div class="sidebar-title">Ã°Å¸Â¤â Ã¬Å¾ÂÃ«Ââ¢ Ã¬ËËÃ¬Â§â Ã¬ÆÂÃ­ÆÅ</div>
+                    <div class="sidebar-title">🤖 자동 수집 상태</div>
                     <div class="status-panel">
                         <div class="status-row">
-                            <span class="status-label">Ã¬ÆÂÃ­ÆÅ</span>
-                            <span class="status-value status-running" id="collectStatus">Ã¬â¹Â¤Ã­ââ°Ã¬Â¤â</span>
+                            <span class="status-label">상태</span>
+                            <span class="status-value status-running" id="collectStatus">실행중</span>
                         </div>
                         <div class="status-row">
-                            <span class="status-label">Ã«Â§ËÃ¬Â§â¬Ã«Â§â° Ã¬ËËÃ¬Â§â</span>
-                            <span class="status-value" id="lastCollect">Ã«Â°Â©ÃªÂ¸Ë Ã¬Â â</span>
+                            <span class="status-label">마지막 수집</span>
+                            <span class="status-value" id="lastCollect">방금 전</span>
                         </div>
                         <div class="status-row">
-                            <span class="status-label">Ã«â¹Â¤Ã¬ÂÅ Ã¬ËËÃ¬Â§â</span>
-                            <span class="status-value" id="nextCollect">5Ã«Â¶â Ã­âºâ</span>
+                            <span class="status-label">다음 수집</span>
+                            <span class="status-value" id="nextCollect">5분 후</span>
                         </div>
                         <div class="status-row">
-                            <span class="status-label">Ã¬ËËÃ¬Â§â Ã­â ÂµÃªÂ³â</span>
-                            <span class="status-value" id="collectStats">Ã¬Â´Â 1,234ÃªÂ±Â´</span>
+                            <span class="status-label">수집 통계</span>
+                            <span class="status-value" id="collectStats">총 1,234건</span>
                         </div>
                         <div style="margin-top: 8px; border-top: 1px solid #e5e7eb; padding-top: 8px;">
-                            <div class="sidebar-title" style="margin-bottom: 6px;">Ã¬ÂµÅÃªÂ·Â¼ Ã«Â¡ÅÃªÂ·Â¸</div>
+                            <div class="sidebar-title" style="margin-bottom: 6px;">최근 로그</div>
                             <div id="collectLogs">
-                                <div class="log-item">Ã¢Åâ Ã­ââÃ«Â¡ÅÃ­â¢â @user1 Ã¬ËËÃ¬Â§â Ã¬â¢âÃ«Â£Å</div>
-                                <div class="log-item">Ã¢Åâ Ã­âÂ¤Ã¬âºÅÃ«âÅ "Ã­ÅÂ¨Ã¬â¦Ë" Ã¬ËËÃ¬Â§â Ã¬â¢âÃ«Â£Å</div>
-                                <div class="log-item">Ã¢ÂÂ³ @user2 Ã¬ËËÃ¬Â§â Ã¬Â¤â...</div>
+                                <div class="log-item">✓ 프로필 @user1 수집 완료</div>
+                                <div class="log-item">✓ 키워드 "패션" 수집 완료</div>
+                                <div class="log-item">⏳ @user2 수집 중...</div>
                             </div>
                         </div>
                     </div>
@@ -1020,20 +1020,20 @@
 
                 <!-- Tracked Profiles -->
                 <div class="sidebar-card">
-                    <div class="sidebar-title">Ã°Å¸âÂ¤ Ã¬Â¶âÃ¬Â Â Ã­ââÃ«Â¡ÅÃ­â¢â</div>
+                    <div class="sidebar-title">👤 추적 프로필</div>
                     <div class="profile-list" id="profileList">
                         <div class="profile-item">
                             <span class="profile-name">@user1</span>
-                            <button class="profile-remove" onclick="removeProfile('user1')">Ã¢Åâ¢</button>
+                            <button class="profile-remove" onclick="removeProfile('user1')">✕</button>
                         </div>
                         <div class="profile-item">
                             <span class="profile-name">@user2</span>
-                            <button class="profile-remove" onclick="removeProfile('user2')">Ã¢Åâ¢</button>
+                            <button class="profile-remove" onclick="removeProfile('user2')">✕</button>
                         </div>
                     </div>
                     <div class="profile-input-group">
-                        <input type="text" id="profileInput" placeholder="Ã¬âÂ¬Ã¬Å¡Â©Ã¬Å¾ÂÃ«Âªâ¦ Ã¬Å¾â¦Ã«Â Â¥">
-                        <button onclick="addProfile()">Ã¬Â¶âÃªÂ°â¬</button>
+                        <input type="text" id="profileInput" placeholder="사용자명 입력">
+                        <button onclick="addProfile()">추가</button>
                     </div>
                 </div>
             </div>
@@ -1046,18 +1046,18 @@
     <!-- Scrape Modal -->
     <div class="modal" id="scrapeModal">
         <div class="modal-content">
-            <div class="modal-header">Ã°Å¸Â§Âµ Ã¬ÆËÃ«Â¡ÅÃ¬Å¡Â´ Ã¬Å Â¤Ã«Â ËÃ«âÅ Ã¬ËËÃ¬Â§â</div>
+            <div class="modal-header">🧵 새로운 스레드 수집</div>
             <div class="modal-body">
                 <div class="modal-result" id="scrapeResult"></div>
-                <input type="text" class="modal-input" id="scrapeInput" placeholder="Ã¬âÂ¬Ã¬Å¡Â©Ã¬Å¾ÂÃ«Âªâ¦Ã¬Ââ Ã¬â°Â¼Ã­âÅÃ«Â¡Å ÃªÂµÂ¬Ã«Â¶âÃ­â¢ËÃ¬âÂ¬ Ã¬Å¾â¦Ã«Â Â¥ (Ã¬ËË: @user1, @user2)">
+                <input type="text" class="modal-input" id="scrapeInput" placeholder="사용자명을 쉼표로 구분하여 입력 (예: @user1, @user2)">
                 <label style="font-size: 12px; color: #6b7280;">
-                    <input type="checkbox" id="autoAddProfile" checked> Ã­ââÃ«Â¡ÅÃ­â¢â Ã¬Å¾ÂÃ«Ââ¢ Ã¬Â¶âÃ¬Â ÂÃ¬âÂ Ã¬Â¶âÃªÂ°â¬
+                    <input type="checkbox" id="autoAddProfile" checked> 프로필 자동 추적에 추가
                 </label>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeScrapeModal()">Ã«Â·Â¨Ã¬â Å</button>
+                <button class="btn btn-secondary" onclick="closeScrapeModal()">뷨소</button>
                 <button class="btn btn-primary" id="scrapeBtn" onclick="startScrape()">
-                    <span>Ã¬ËËÃ¬Â§â Ã¬â¹ÅÃ¬Å¾â</span>
+                    <span>수집 시작</span>
                 </button>
             </div>
         </div>
@@ -1099,7 +1099,7 @@
             {
                 threadId: 1,
                 author: 'fashion_blogger',
-                content: 'Ã¬ÆË Ã¬â¹ÅÃ¬Â¦Å Ã­Å Â¸Ã«Â ÅÃ«âÅ Ã­ÅÂ¨Ã¬â¦Ë Ã¬â¢âÃ¬ÂÂ´Ã¬â¦Å Ã¬Â¶âÃ¬Â²Å! Ã¬ÂÂ´ Ã«ââº+Â ËÃ¬Å Â¤Ã«Å â Ã¬Â â¢Ã«Â§Â amazing... Ã­ÂÂ´Ã«Â¦Â­Ã­â¢ËÃ«Â©Â´ 20% Ã­â¢Â Ã¬ÂÂ¸ Ã«Â°âºÃ¬Ââ Ã¬ËË Ã¬Å¾ËÃ¬âÂ´Ã¬Å¡â!',
+                content: '새 시즌 트렌드 패션 아이셜 추천! 이 듛+��스는 정말 amazing... 클릭하면 20% 할인 받을 수 있어요!',
                 category: 'shopping',
                 region: 'domestic',
                 viewTier: '10k',
@@ -1112,7 +1112,7 @@
             {
                 threadId: 2,
                 author: 'tech_news_daily',
-                content: 'Ã¬ÂÂ¸ÃªÂ³ÂµÃ¬Â§â¬Ã«Å Â¥ ÃªÂ·ÅÃ¬Â Å Ã«â¦Â¼Ã¬ÂË "ÃªÂ³Â¼Ã«ÂâÃ­â¢ËÃ«Â©Â´ Ã­ËÂÃ¬â¹Â  Ã¬Â â¬Ã­â¢Â´" Ã«â¦Â¼Ã¬Å¸Â ÃªÂ°â¬Ã¬â¡Â´... Ã¬Â âÃ«Â¬Â¸ÃªÂ°â¬Ã«âÂ¤Ã¬ÂË Ã¬ÂËÃªÂ²Â¬Ã¬Ââ Ã«âÂ¤Ã¬âÂ´Ã«Â´Â¤Ã¬Å ÂµÃ«â¹ËÃ«â¹Â¤.',
+                content: '인공지능 규제 논의 "과도하면 혁신 저해" 논쟁 가쇴... 전문가들의 의견을 들어봤습니다.',
                 category: 'issue',
                 region: 'domestic',
                 viewTier: '50k',
@@ -1125,7 +1125,7 @@
             {
                 threadId: 3,
                 author: 'morning_thoughts',
-                content: 'Ã¬â¢âÃ¬Â¹Â¸Ã¬âÂ Ã¬ÂÂ¼ÃªÂ°ÅÃ«âËÃ¬âÅ Ã¬Â°Â½Ã«Â°âÃ¬Ââ Ã«Â´Â¤Ã«Å âÃ«ÂÂ° Ã«âÂ Ã¬âÂ¨ÃªÂ°â¬ Ã¬Â â¢Ã«Â§Â Ã¬Â¢â¹Ã«âÂ¤Ã¬Å¡â. Ã¬ËÂ¤Ã«Å Ë Ã­â¢ËÃ«Â£Â¨Ã«Ââ Ã­â¢âÃ¬ÂÂ´Ã­Åâ¦! Ã°Å¸âÂª',
+                content: '아칸에 일개나서 창밖을 봤는데 날씨가 정말 좋네요. 오늘 하루도 화이팅! 💪',
                 category: 'personal',
                 region: 'domestic',
                 viewTier: '1k',
@@ -1138,7 +1138,7 @@
             {
                 threadId: 4,
                 author: 'beauty_expert',
-                content: 'Ã¬Å¡âÃ¬Â¦Ë ÃªÂ°â¬Ã¬Å¾Â¥ Ã­â¢Â«Ã­â¢Å Ã«Â·Â°Ã­â¹Â° Ã­Å Â¸Ã«Â ÅÃ«âÅ TOP 5! Ã¬ÂÂ´ Ã¬Â ÅÃ­âËÃ«âÂ¤Ã¬Ââ Ã¬âÂ¬Ã¬Å¡Â©Ã­â¢ËÃ«Â©Â´ Ã¬Â â¢Ã«Â§Â Ã­âÂ¼Ã«Â¶â¬ÃªÂ°â¬ Ã¬Â¢â¹Ã¬â¢âÃ¬Â Â¸Ã¬Å¡â. Ã¬â¢âÃ«Â§ËÃ¬Â¡Â´Ã¬âÂÃ¬âÅ Ã¬Â§â¬ÃªÂ¸Ë Ã¬âÂ¸Ã¬ÂÂ¼Ã¬Â¤â!',
+                content: '요즘 가장 핫한 뷰티 트렌드 TOP 5! 이 제품들을 사용하면 정말 피부가 좋아져요. 아마존에서 지금 세일중!',
                 category: 'shopping',
                 region: 'overseas',
                 viewTier: '100k',
@@ -1151,7 +1151,7 @@
             {
                 threadId: 5,
                 author: 'economy_watcher',
-                content: 'Ã«â¹Â¬Ã«Å¸Â¬ Ã­â¢ËÃ¬ÅÂ¨Ã¬ÂÂ´ ÃªÂ¸â°Ã«âÂ±Ã­âËÃ¬Å ÂµÃ«â¹ËÃ«â¹Â¤. ÃªÂ²Â½Ã¬Â Å Ã¬Â âÃ«Â¬Â¸ÃªÂ°â¬Ã«âÂ¤Ã¬Ââ¬ Ã¬ÂÂ´ÃªÂ²ÆÃ¬ÂÂ´ Ã¬ÂÂ¼Ã¬â¹ÅÃ¬Â ÂÃ¬ÂÂ´Ã«ÂÂ¼ÃªÂ³Â  Ã«Â¶âÃ¬âÂÃ­â¢ËÃªÂ³Â  Ã¬Å¾ËÃ¬Å ÂµÃ«â¹ËÃ«â¹Â¤.',
+                content: '달러 환율이 급등했습니다. 경제 전문가들은 이것이 일시적이라고 분석하고 있습니다.',
                 category: 'issue',
                 region: 'domestic',
                 viewTier: '5k',
@@ -1168,46 +1168,46 @@
             const now = new Date();
             const seconds = Math.floor((now - date) / 1000);
 
-            if (seconds < 60) return 'Ã«Â°Â©ÃªÂ¸Ë Ã¬Â â';
-            if (seconds < 3600) return Math.floor(seconds / 60) + 'Ã«Â¶â Ã¬Â â';
-            if (seconds < 86400) return Math.floor(seconds / 3600) + 'Ã¬â¹ÅÃªÂ°â Ã¬Â â';
-            if (seconds < 604800) return Math.floor(seconds / 86400) + 'Ã¬ÂÂ¼ Ã¬Â â';
+            if (seconds < 60) return '방금 전';
+            if (seconds < 3600) return Math.floor(seconds / 60) + '분 전';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + '시간 전';
+            if (seconds < 604800) return Math.floor(seconds / 86400) + '일 전';
             return date.toLocaleDateString('ko-KR');
         }
 
         function formatNumber(n) {
             if (n === undefined || n === null) return '0';
             n = Number(n) || 0;
-            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'Ã«Â°Â±Ã«Â§Å';
-            if (n >= 100000) return (n / 100000).toFixed(1) + 'Ã¬â¹Â­Ã§Å¾Å';
-            if (n >= 10000) return (n / 10000).toFixed(1) + 'Ã«Â§Å';
-            if (n >= 1000) return (n / 1000).toFixed(1) + 'Ã¬Â²Å';
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + '백만';
+            if (n >= 100000) return (n / 100000).toFixed(1) + '십瞌';
+            if (n >= 10000) return (n / 10000).toFixed(1) + '만';
+            if (n >= 1000) return (n / 1000).toFixed(1) + '천';
             return n.toString();
         }
 
         function getCategoryBadge(cat) {
             const badges = {
-                shopping: { class: 'badge-category-shopping', text: 'Ã°Å¸âºâ Ã¬â¡Â¼Ã­â¢â' },
-                issue: { class: 'badge-category-issue', text: 'Ã°Å¸âÂ° Ã¬ÂÂ´Ã¬Å Ë' },
-                personal: { class: 'badge-category-personal', text: 'Ã°Å¸âÂ¤ Ã­ÂÂ¼Ã¬Å Â¤Ã«âÂ' }
+                shopping: { class: 'badge-category-shopping', text: '🛒 쇼핑' },
+                issue: { class: 'badge-category-issue', text: '📰 이슈' },
+                personal: { class: 'badge-category-personal', text: '👤 퍼스널' }
             };
             return badges[cat] || { class: '', text: cat };
         }
 
         function getRegionBadge(region) {
             return region === 'domestic'
-                ? { class: 'badge-region-domestic', text: 'Ã°Å¸â¡Â°Ã°Å¸â¡Â· ÃªÂµÂ­Ã«âÂ´' }
-                : { class: 'badge-region-overseas', text: 'Ã°Å¸ÅÂ Ã­â¢Â´Ã¬â¢Â¸' };
+                ? { class: 'badge-region-domestic', text: '🇰🇷 국내' }
+                : { class: 'badge-region-overseas', text: '🌐 해외' };
         }
 
         function getTierBadge(tier) {
             const badges = {
-                under1k: { color: '#9ca3af', text: '1K Ã«Â¯Â¸Ã«Â§Å' },
+                under1k: { color: '#9ca3af', text: '1K 미만' },
                 '1k': { color: '#3b82f6', text: '1K+' },
                 '5k': { color: '#10b981', text: '5K+' },
-                '10k': { color: '#f59e0b', text: '1Ã«Â§Å+' },
-                '50k': { color: '#ef4444', text: '5Ã«Â§Å+' },
-                '100k': { color: '#8b5cf6', text: '10Ã«Â§Å+' }
+                '10k': { color: '#f59e0b', text: '1만+' },
+                '50k': { color: '#ef4444', text: '5만+' },
+                '100k': { color: '#8b5cf6', text: '10만+' }
             };
             const badge = badges[tier] || badges.under1k;
             return `<span class="badge" style="background-color: ${badge.color}20; color: ${badge.color};">${badge.text}</span>`;
@@ -1215,9 +1215,9 @@
 
         function getSourceBadge(source) {
             const badges = {
-                auto_keyword: 'Ã¬Å¾ÂÃ«Ââ¢(Ã­âÂ¤Ã¬âºÅÃ«âÅ)',
-                auto_profile: 'Ã¬Å¾ÂÃ«Ââ¢(Ã­ââÃ«Â¡ÅÃ­â¢â)',
-                manual: 'Ã¬ËËÃ«Ââ¢'
+                auto_keyword: '자동(키워드)',
+                auto_profile: '자동(프로필)',
+                manual: '수동'
             };
             return badges[source] || source;
         }
@@ -1330,7 +1330,7 @@
 
             // Tier Bar
             const total = Object.values(data.viewTierDist).reduce((a, b) => a + b, 0);
-            const tierNames = { under1k: '1K Ã«Â¯Â¸Ã«Â§Å', '1k': '1K+', '5k': '5K+', '10k': '1Ã«Â§Å+', '50k': '5Ã«Â§Å+', '100k': '10Ã«Â§Å+' };
+            const tierNames = { under1k: '1K 미만', '1k': '1K+', '5k': '5K+', '10k': '1만+', '50k': '5만+', '100k': '10만+' };
             const tierColors = { under1k: 'tier-under1k', '1k': 'tier-1k', '5k': 'tier-5k', '10k': 'tier-10k', '50k': 'tier-50k', '100k': 'tier-100k' };
 
             let tierBar = '';
@@ -1347,7 +1347,7 @@
             // Category Chart
             let catChart = '';
             Object.entries(data.byCat).forEach(([cat, count]) => {
-                const catName = { shopping: 'Ã°Å¸âºâ Ã¬â¡Â¼Ã­â¢â', issue: 'Ã°Å¸âÂ° Ã¬ÂÂ´Ã¬Å Ë', personal: 'Ã°Å¸âÂ¤ Ã­ÂÂ¼Ã¬Å Â¤Ã«âÂ' }[cat];
+                const catName = { shopping: '🛒 쇼핑', issue: '📰 이슈', personal: '👤 퍼스널' }[cat];
                 const percent = ((count / data.total) * 100).toFixed(1);
                 catChart += `
                     <div class="chart-item">
@@ -1364,7 +1364,7 @@
             // Tier Chart
             let tierChart = '';
             Object.entries(data.viewTierDist).forEach(([tier, count]) => {
-                const tierName = { under1k: '1K Ã«Â¯Â¸Ã«Â§Å', '1k': '1K+', '5k': '5K+', '10k': '1Ã«Â§Å+', '50k': '5Ã«Â§Å+', '100k': '10Ã«Â§Å+' }[tier];
+                const tierName = { under1k: '1K 미만', '1k': '1K+', '5k': '5K+', '10k': '1만+', '50k': '5만+', '100k': '10만+' }[tier];
                 const percent = ((count / total) * 100).toFixed(1);
                 tierChart += `
                     <div class="chart-item">
@@ -1418,17 +1418,17 @@
                                     <span class="badge ${regionBadge.class}">${regionBadge.text}</span>
                                     ${getTierBadge(thread.viewTier)}
                                     <span class="badge badge-source">${getSourceBadge((thread.source || thread.collectionSource))}</span>
-                                    ${hasAffiliate ? `<span class="badge badge-affiliate">Ã°Å¸ââ ${affPlatform || 'Ã¬Â ÅÃ­ÅÂ´Ã«Â§ÂÃ­ÂÂ¬'}</span>` : ''}
+                                    ${hasAffiliate ? `<span class="badge badge-affiliate">🔗 ${affPlatform || '제휴링크'}</span>` : ''}
                                 </div>
                             </div>
                         </div>
                         <div class="thread-content">${contentText}</div>
-                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" class="thread-image" alt="Ã¬Å Â¤Ã«Â ËÃ«âÅ Ã¬ÂÂ´Ã«Â¯Â¸Ã¬Â§â¬" onerror="this.style.display='none'">` : ''}
+                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" class="thread-image" alt="스레드 이미지" onerror="this.style.display='none'">` : ''}
                         <div class="thread-metrics">
-                            <div class="metric-item">Ã¢ÂÂ¤Ã¯Â¸Â ${formatNumber(metrics.likes||0)}</div>
-                            <div class="metric-item">Ã°Å¸âÂ¬ ${formatNumber(metrics.replies||0)}</div>
-                            <div class="metric-item">Ã°Å¸ââ ${formatNumber(metrics.reposts||0)}</div>
-                            <div class="metric-item">Ã°Å¸âÂÃ¯Â¸Â ${formatNumber(metrics.views||metrics.quotes||0||0)}</div>
+                            <div class="metric-item">❤️ ${formatNumber(metrics.likes||0)}</div>
+                            <div class="metric-item">💬 ${formatNumber(metrics.replies||0)}</div>
+                            <div class="metric-item">🔄 ${formatNumber(metrics.reposts||0)}</div>
+                            <div class="metric-item">👁️ ${formatNumber(metrics.views||metrics.quotes||0||0)}</div>
                         </div>
                         <div class="engagement-bar">
                             <div class="engagement-fill" style="width: ${engagementPercent}%;"></div>
@@ -1436,26 +1436,26 @@
                     </div>
                 `;
             });
-            document.getElementById('threadFeed').innerHTML = html || '<div style="text-align: center; padding: 40px; color: #9ca3af;">ÃªÂ²â¬Ã¬Æâ° ÃªÂ²Â°ÃªÂ³Â¼ÃªÂ°â¬ Ã¬ââ Ã¬Å ÂµÃ«â¹ËÃ«â¹Â¤.</div>';
+            document.getElementById('threadFeed').innerHTML = html || '<div style="text-align: center; padding: 40px; color: #9ca3af;">검색 결과가 없습니다.</div>';
             renderPagination(pagination.page || data.page || 1, pagination.pages || data.pages || 1);
         }
 
         function renderCollectorStatus(data) {
             const status = data.autoCollectStatus || data;
             const isRunning = status.isRunning || false;
-            document.getElementById('collectStatus').textContent = isRunning ? 'Ã¬â¹Â¤Ã­ââ°Ã¬Â¤â' : 'Ã«Åâ¬ÃªÂ¸Â°Ã¬Â¤â';
+            document.getElementById('collectStatus').textContent = isRunning ? '실행중' : '대기중';
             document.getElementById('collectStatus').className = isRunning ? 'status-value status-running' : 'status-value status-waiting';
-            document.getElementById('lastCollect').textContent = status.lastRunAt ? timeAgo(new Date(status.lastRunAt)) : 'Ã¬ââ Ã¬ÂÅ';
-            document.getElementById('nextCollect').textContent = status.nextRunAt ? timeAgo(new Date(status.nextRunAt)) : 'Ã«Åâ¬ÃªÂ¸Â°Ã¬Â¤â';
-            document.getElementById('collectStats').textContent = 'Ã¬Â´Â ' + formatNumber(status.stats?.totalCollected || status.totalCollected || data.totalCollected || 0) + 'ÃªÂ±Â´';
+            document.getElementById('lastCollect').textContent = status.lastRunAt ? timeAgo(new Date(status.lastRunAt)) : '없음';
+            document.getElementById('nextCollect').textContent = status.nextRunAt ? timeAgo(new Date(status.nextRunAt)) : '대기중';
+            document.getElementById('collectStats').textContent = '총 ' + formatNumber(status.stats?.totalCollected || status.totalCollected || data.totalCollected || 0) + '건';
 
             let logs = '';
             const recentLogs = status.recentLogs || status.logs || [];
             recentLogs.slice(0, 5).forEach(log => {
-                const msg = typeof log === 'string' ? log : `${(log.type === 'error' || log.level === 'error') ? 'Ã¢ÂÅ' : 'Ã¢Åâ'} ${log.message || log}`;
+                const msg = typeof log === 'string' ? log : `${(log.type === 'error' || log.level === 'error') ? '❌' : '✓'} ${log.message || log}`;
                 logs += `<div class="log-item">${msg}</div>`;
             });
-            document.getElementById('collectLogs').innerHTML = logs || '<div class="log-item">Ã¬â¢âÃ¬Â§Â Ã¬ËËÃ¬Â§â ÃªÂ¸Â°Ã«Â¡ÂÃ¬ÂÂ´ Ã¬ââ Ã¬Å ÂµÃ«â¹ËÃ«â¹Â¤.</div>';
+            document.getElementById('collectLogs').innerHTML = logs || '<div class="log-item">아직 수집 기록이 없습니다.</div>';
         }
 
         function renderProfiles(profiles) {
@@ -1464,7 +1464,7 @@
                 html += `
                     <div class="profile-item">
                         <span class="profile-name">@${profile}</span>
-                        <button class="profile-remove" onclick="removeProfile('${profile}')">Ã¢Åâ¢</button>
+                        <button class="profile-remove" onclick="removeProfile('${profile}')">✕</button>
                     </div>
                 `;
             });
@@ -1474,13 +1474,13 @@
         function renderPagination(page, pages) {
             let html = '';
             if (page > 1) {
-                html += `<button onclick="goToPage(${page - 1})">Ã¬ÂÂ´Ã¬Â â</button>`;
+                html += `<button onclick="goToPage(${page - 1})">이전</button>`;
             }
             for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++) {
                 html += `<button class="${i === page ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
             }
             if (page < pages) {
-                html += `<button onclick="goToPage(${page + 1})">Ã«â¹Â¤Ã¬ÂÅ</button>`;
+                html += `<button onclick="goToPage(${page + 1})">다음</button>`;
             }
             document.getElementById('pagination').innerHTML = html;
         }
@@ -1505,13 +1505,13 @@
         async function startScrape() {
             const input = document.getElementById('scrapeInput').value.trim();
             if (!input) {
-                alert('Ã¬âÂ¬Ã¬Å¡Â©Ã¬Å¾ÂÃ«Âªâ¦Ã¬Ââ Ã¬Å¾â¦Ã«Â Â¥Ã­â¢Â´Ã¬Â£Â¼Ã¬âÂ¸Ã¬Å¡â.');
+                alert('사용자명을 입력해주세요.');
                 return;
             }
 
             const btn = document.getElementById('scrapeBtn');
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<span class="loading-spinner"></span><span>Ã¬ËËÃ¬Â§â Ã¬Â¤â...</span>';
+            btn.innerHTML = '<span class="loading-spinner"></span><span>수집 중...</span>';
             btn.disabled = true;
 
             try {
@@ -1523,7 +1523,7 @@
                 const data = await response.json();
 
                 const result = document.getElementById('scrapeResult');
-                result.textContent = 'Ã¢Åâ ' + data.message;
+                result.textContent = '✓ ' + data.message;
                 result.style.display = 'block';
 
                 if (document.getElementById('autoAddProfile').checked) {
@@ -1539,7 +1539,7 @@
                     loadThreads();
                 }, 1500);
             } catch (error) {
-                alert('Ã¬ËËÃ¬Â§â Ã¬Â¤â Ã¬ËÂ¤Ã«Â¥ËÃªÂ°â¬ Ã«Â°ÅÃ¬ÆÂÃ­âËÃ¬Å ÂµÃ«â¹ËÃ«â¹Â¤: ' + error.message);
+                alert('수집 중 오류가 발생했습니다: ' + error.message);
             } finally {
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
@@ -1551,7 +1551,7 @@
             const name = username || input.value.trim().replace('@', '');
 
             if (!name) {
-                alert('Ã¬âÂ¬Ã¬Å¡Â©Ã¬Å¾ÂÃ«Âªâ¦Ã¬Ââ Ã¬Å¾â¦Ã«Â Â¥Ã­â¢Â´Ã¬Â£Â¼Ã¬âÂ¸Ã¬Å¡â.');
+                alert('사용자명을 입력해주세요.');
                 return;
             }
 
