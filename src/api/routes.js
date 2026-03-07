@@ -562,6 +562,102 @@ router.post('/seed-demo', async (req, res) => {
 /**
  * DELETE /threads/all - Clear all threads
  */
+
+  // ============================================================
+  // POST /threads/batch-collect - Chrome 확장프로그램 배치 수집
+  // ============================================================
+  router.post('/threads/batch-collect', async (req, res) => {
+    try {
+      const { threads } = req.body;
+
+      if (!Array.isArray(threads) || threads.length === 0) {
+        return res.status(400).json({ error: 'threads 배열이 필요합니다' });
+      }
+
+      const results = { collectedCount: 0, duplicateCount: 0, errorCount: 0, errors: [] };
+
+      for (const threadData of threads) {
+        try {
+          if (!threadData.threadId) {
+            results.errorCount++;
+            results.errors.push({ error: 'threadId 누락' });
+            continue;
+          }
+
+          // 중복 체크
+          const existing = await Thread.findOne({ threadId: threadData.threadId });
+          if (existing) {
+            results.duplicateCount++;
+            continue;
+          }
+
+          // Thread 문서 생성 (확장프로그램에서 이미 분류된 데이터)
+          const validCategories = ['shopping', 'issue', 'personal', 'uncategorized'];
+          const validRegions = ['domestic', 'overseas'];
+          const validViewTiers = ['under1k', '1k', '5k', '10k', '50k', '100k'];
+
+          const threadDoc = new Thread({
+            threadId: threadData.threadId,
+            platform: threadData.platform || 'threads',
+            originalUrl: threadData.originalUrl || '',
+            author: {
+              username: threadData.author?.username || 'unknown',
+              displayName: threadData.author?.displayName || threadData.author?.username || '',
+              profilePicUrl: threadData.author?.profilePicUrl || '',
+              isVerified: threadData.author?.isVerified || false,
+              followerCount: threadData.author?.followerCount || 0,
+            },
+            content: {
+              text: threadData.content?.text || '',
+              mediaType: threadData.content?.mediaType || 'text',
+              mediaUrls: threadData.content?.mediaUrls || [],
+              thumbnailUrl: threadData.content?.thumbnailUrl || '',
+              urls: threadData.content?.urls || [],
+              hashtags: threadData.content?.hashtags || [],
+              mentions: threadData.content?.mentions || [],
+            },
+            category: {
+              primary: validCategories.includes(threadData.category?.primary) ? threadData.category.primary : 'uncategorized',
+              confidence: threadData.category?.confidence || 0,
+              classifiedBy: threadData.category?.classifiedBy || 'rule',
+              classifiedAt: threadData.category?.classifiedAt || new Date(),
+            },
+            region: validRegions.includes(threadData.region) ? threadData.region : 'domestic',
+            viewTier: validViewTiers.includes(threadData.viewTier) ? threadData.viewTier : 'under1k',
+            collectionSource: 'api',
+            affiliate: {
+              hasAffiliate: threadData.affiliate?.hasAffiliate || false,
+              links: (threadData.affiliate?.links || []).map(l => ({
+                url: l.url || '',
+                platform: l.platform || 'other',
+              })),
+            },
+            metrics: {
+              likes: threadData.metrics?.likes || 0,
+              replies: threadData.metrics?.replies || 0,
+              reposts: threadData.metrics?.reposts || 0,
+              views: threadData.metrics?.views || 0,
+            },
+            source: 'extension',
+            collectedAt: threadData.collectedAt || new Date(),
+          });
+
+          await threadDoc.save();
+          results.collectedCount++;
+
+        } catch (error) {
+          results.errorCount++;
+          results.errors.push({ threadId: threadData.threadId, error: error.message });
+        }
+      }
+
+      res.json({ success: true, ...results });
+
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
 router.delete('/threads/all', async (req, res) => {
   try {
     const result = await Thread.deleteMany({});
