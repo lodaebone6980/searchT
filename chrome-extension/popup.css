@@ -5,7 +5,7 @@
 }
 
 body {
-  width: 320px;
+  width: 340px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   color: #1a1a1a;
@@ -44,21 +44,7 @@ body {
 
 .dashboard-link:hover { opacity: 1; }
 
-/* 토글 섹션 */
-.toggle-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  background: white;
-  border-bottom: 1px solid #eee;
-}
-
-.toggle-label {
-  font-weight: 600;
-  font-size: 13px;
-}
-
+/* 토글 스위치 (공통) */
 .toggle-switch {
   position: relative;
   display: inline-block;
@@ -90,11 +76,120 @@ body {
 }
 
 input:checked + .slider {
-  background-color: #10B981;
+  background-color: #3B82F6;
 }
 
 input:checked + .slider:before {
   transform: translateX(20px);
+}
+
+/* 자동 스크롤 섹션 */
+.scroll-section {
+  background: white;
+  border-bottom: 1px solid #eee;
+}
+
+.scroll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+}
+
+.scroll-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.scroll-icon {
+  font-size: 16px;
+}
+
+.scroll-icon.active {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* 속도 선택 */
+.speed-selector {
+  padding: 0 16px 10px;
+}
+
+.speed-label {
+  font-size: 11px;
+  color: #6B7280;
+  margin-bottom: 6px;
+}
+
+.speed-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.speed-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 6px;
+  background: white;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.speed-btn:hover {
+  border-color: #93C5FD;
+  background: #EFF6FF;
+}
+
+.speed-btn.active {
+  border-color: #3B82F6;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  font-weight: 600;
+}
+
+/* 스크롤 상태 표시 */
+.scroll-status {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #F0F9FF;
+  border-top: 1px solid #E0F2FE;
+}
+
+.scroll-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.scroll-stat-label {
+  font-size: 10px;
+  color: #6B7280;
+}
+
+.scroll-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3B82F6;
+}
+
+.scroll-stat-value.paused {
+  color: #F59E0B;
+}
+
+.scroll-stat-value.stopped {
+  color: #EF4444;
 }
 
 /* 통계 그리드 */
@@ -157,7 +252,6 @@ input:checked + .slider:before {
 }
 
 .btn-primary:hover { background: #059669; }
-
 .btn-primary:active { transform: scale(0.97); }
 
 .btn-secondary {
@@ -273,3 +367,28 @@ input:checked + .slider:before {
 /* 스크롤바 */
 .log-list::-webkit-scrollbar { width: 4px; }
 .log-list::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 4px; }
+
+/* 알림 배너 */
+.notification {
+  padding: 8px 16px;
+  font-size: 12px;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.notification.warning {
+  background: #FEF3C7;
+  color: #92400E;
+  border-bottom: 1px solid #FDE68A;
+}
+
+.notification.info {
+  background: #DBEAFE;
+  color: #1E40AF;
+  border-bottom: 1px solid #BFDBFE;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
