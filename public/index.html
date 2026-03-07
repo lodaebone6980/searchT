@@ -1,538 +1,1599 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ThreadsCollector</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
-nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
-.nav-left{display:flex;align-items:center;gap:12px}
-.nav-logo{font-size:24px}
-.nav-title{font-size:18px;font-weight:700}
-.nav-sub{font-size:11px;opacity:0.7}
-.nav-right{display:flex;align-items:center;gap:10px}
-.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;transition:all 0.2s}
-.btn-collect{background:#10b981;color:#fff}
-.btn-collect:hover{background:#059669}
-.btn-collect.loading{opacity:0.7;pointer-events:none}
-.btn-token{background:rgba(255,255,255,0.15);color:#fff;font-size:12px}
-.btn-token:hover{background:rgba(255,255,255,0.25)}
-.nav-badge{background:#10b981;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
-.nav-status{font-size:11px;opacity:0.7}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThreadsCollector - Meta Threads 빅데이터 수집 & 분석 플랫폼</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-.container{max-width:1200px;margin:0 auto;padding:20px}
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
-.stat-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
-.stat-icon{font-size:20px;margin-bottom:8px}
-.stat-value{font-size:28px;font-weight:700}
-.stat-label{font-size:12px;color:#666;margin-top:4px}
-.stat-trend{font-size:12px;font-weight:600;float:right;margin-top:-40px}
-.stat-trend.up{color:#10b981}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background-color: #f0f2f5;
+            color: #1f2937;
+            line-height: 1.6;
+        }
 
-.tabs{display:flex;gap:8px;margin-bottom:16px}
-.tab{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:600;background:#fff;color:#666;transition:all 0.2s}
-.tab.active{background:#1a1a2e;color:#fff}
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
-.filter-group{display:flex;gap:4px;padding:4px;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
-.filter-btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#666;transition:all 0.2s}
-.filter-btn.active{background:#1a1a2e;color:#fff}
-.filter-btn.cat-shopping.active{background:#f59e0b;color:#fff}
-.filter-btn.cat-issue.active{background:#3b82f6;color:#fff}
-.filter-btn.cat-personal.active{background:#8b5cf6;color:#fff}
-.filter-btn.region-domestic.active{background:#10b981;color:#fff}
-.filter-btn.region-overseas.active{background:#ef4444;color:#fff}
+        /* Header */
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
 
-.search-bar{flex:1;min-width:200px;position:relative}
-.search-bar input{width:100%;padding:10px 16px 10px 36px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;background:#fff}
-.search-bar input:focus{outline:none;border-color:#1a1a2e;box-shadow:0 0 0 3px rgba(26,26,46,0.1)}
-.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#999;font-size:14px}
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
 
-.sort-select{padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;background:#fff;cursor:pointer}
+        .logo {
+            font-size: 28px;
+        }
 
-.content-area{display:flex;gap:20px}
-.feed{flex:1;min-width:0}
-.feed-count{font-size:13px;color:#666;margin-bottom:12px}
+        .logo-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #10b981;
+            margin: 0;
+        }
 
-.thread-card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border-left:4px solid #e5e7eb;transition:all 0.2s}
-.thread-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);transform:translateY(-1px)}
-.thread-card.cat-shopping{border-left-color:#f59e0b}
-.thread-card.cat-issue{border-left-color:#3b82f6}
-.thread-card.cat-personal{border-left-color:#8b5cf6}
-.thread-card.deleted{opacity:0.6;background:#fff5f5}
+        .logo-text p {
+            font-size: 12px;
+            color: #6b7280;
+            margin: 4px 0 0 0;
+        }
 
-.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.author-info{display:flex;align-items:center;gap:10px}
-.avatar{width:40px;height:40px;border-radius:50%;background:#e5e7eb;overflow:hidden;flex-shrink:0}
-.avatar img{width:100%;height:100%;object-fit:cover}
-.author-name{font-weight:600;font-size:14px}
-.author-time{font-size:11px;color:#999}
-.card-badges{display:flex;gap:6px;flex-wrap:wrap}
-.badge{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600}
-.badge-cat{background:#f0f0f0;color:#666}
-.badge-shopping{background:#fef3c7;color:#92400e}
-.badge-issue{background:#dbeafe;color:#1e40af}
-.badge-personal{background:#ede9fe;color:#5b21b6}
-.badge-sub{background:#f0fdf4;color:#166534}
-.badge-verified{background:#dbeafe;color:#1d4ed8}
-.badge-affiliate{background:#fef2f2;color:#991b1b}
-.badge-deleted{background:#fee2e2;color:#991b1b}
-.badge-region{font-size:10px;padding:2px 6px;border-radius:4px}
-.badge-domestic{background:#d1fae5;color:#065f46}
-.badge-overseas{background:#fee2e2;color:#991b1b}
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
 
-.card-text{font-size:14px;line-height:1.6;margin-bottom:10px;word-break:break-word}
-.deleted-notice{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-bottom:10px}
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #6b7280;
+        }
 
-.card-media{position:relative;border-radius:8px;overflow:hidden;margin-bottom:10px;max-height:300px}
-.card-media img{width:100%;height:auto;display:block;object-fit:cover;max-height:300px}
-.video-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;padding:3px 8px;border-radius:4px;font-size:11px}
-.carousel-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
-.carousel-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.5)}
-.carousel-dot.active{background:#fff}
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981;
+            animation: pulse 2s infinite;
+        }
 
-.affiliate-url{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;font-size:12px;color:#92400e;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
 
-.card-footer{display:flex;justify-content:space-between;align-items:center}
-.metrics{display:flex;gap:16px;font-size:12px;color:#666}
-.metric{display:flex;align-items:center;gap:4px}
-.sentiment-bar{display:flex;align-items:center;gap:6px;font-size:12px}
-.sentiment-dot{width:8px;height:8px;border-radius:50%}
-.sentiment-dot.positive{background:#10b981}
-.sentiment-dot.neutral{background:#f59e0b}
-.sentiment-dot.negative{background:#ef4444}
-.engagement-bar{width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
-.engagement-fill{height:100%;border-radius:3px}
-.engagement-fill.high{background:#10b981}
-.engagement-fill.mid{background:#f59e0b}
-.engagement-fill.low{background:#ef4444}
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
 
-.sidebar{width:320px;flex-shrink:0}
-.sidebar-card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
-.sidebar-title{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-.cat-bar{display:flex;align-items:center;margin-bottom:8px;font-size:13px}
-.cat-bar-label{width:80px;flex-shrink:0}
-.cat-bar-track{flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;margin:0 8px}
-.cat-bar-fill{height:100%;border-radius:4px}
-.cat-bar-fill.shopping{background:#f59e0b}
-.cat-bar-fill.issue{background:#3b82f6}
-.cat-bar-fill.personal{background:#8b5cf6}
-.cat-bar-count{font-size:12px;color:#666;width:70px;text-align:right}
+        .btn-primary {
+            background-color: #10b981;
+            color: white;
+        }
 
-.region-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.region-box{text-align:center;padding:12px;border-radius:8px}
-.region-box.domestic{background:#d1fae5}
-.region-box.overseas{background:#fee2e2}
-.region-box .region-count{font-size:24px;font-weight:700}
-.region-box .region-label{font-size:11px;color:#666;margin-top:4px}
+        .btn-primary:hover {
+            background-color: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
 
-.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.analytics-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
-.analytics-card h3{font-size:15px;font-weight:700;margin-bottom:12px}
-.sentiment-row{display:flex;align-items:center;margin-bottom:8px;font-size:13px}
-.sentiment-row .label{width:50px}
-.sentiment-row .bar{flex:1;height:10px;background:#f0f0f0;border-radius:5px;overflow:hidden;margin:0 8px}
-.sentiment-row .fill{height:100%;border-radius:5px}
-.sentiment-row .fill.positive{background:#10b981}
-.sentiment-row .fill.neutral{background:#f59e0b}
-.sentiment-row .fill.negative{background:#ef4444}
-.subcat-list{display:flex;flex-direction:column;gap:6px}
-.subcat-item{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f5f5f5}
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
 
-.token-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;justify-content:center;align-items:center}
-.token-modal.show{display:flex}
-.token-dialog{background:#fff;border-radius:16px;padding:24px;width:480px;max-width:90vw}
-.token-dialog h3{font-size:18px;font-weight:700;margin-bottom:16px}
-.token-dialog p{font-size:13px;color:#666;margin-bottom:12px;line-height:1.5}
-.token-dialog input{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;margin-bottom:12px}
-.token-dialog .btn-row{display:flex;gap:8px;justify-content:flex-end}
-.token-dialog .btn-cancel{background:#f0f0f0;color:#666}
-.token-dialog .btn-save{background:#10b981;color:#fff}
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
 
-.empty-state{text-align:center;padding:60px 20px;color:#999}
-.empty-state .icon{font-size:48px;margin-bottom:12px}
-.empty-state p{font-size:14px}
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
 
-@media(max-width:768px){
-  .stats-row{grid-template-columns:repeat(2,1fr)}
-  .content-area{flex-direction:column}
-  .sidebar{width:100%}
-  .analytics-grid{grid-template-columns:1fr}
-  .filters{flex-direction:column}
-}
-</style>
-</head><body>
-<nav>
-  <div class="nav-left">
-    <span class="nav-logo">🧵</span>
-    <div>
-      <div class="nav-title">ThreadsCollector</div>
-      <div class="nav-sub">Meta Threads 빅데이터 수집 및 분석 플랫폼</div>
-    </div>
-  </div>
-  <div class="nav-right">
-    
-    <button class="btn btn-collect" id="collectBtn" onclick="runCollect()">✨ 수집하기</button>
-    <span class="nav-badge" id="totalBadge">0개 수집됨</span>
-    <span class="nav-status" id="lastUpdate"></span>
-  </div>
-</nav>
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
 
-<div class="container">
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-icon">📊</div>
-      <div class="stat-trend up" id="statTrend1">↑ +12.4%</div>
-      <div class="stat-value" id="statTotal">0</div>
-      <div class="stat-label">총 수집 스레드</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">🌟</div>
-      <div class="stat-trend up" id="statTrend2">↑ +8.2%</div>
-      <div class="stat-value" id="statToday">0</div>
-      <div class="stat-label">오늘 수집</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">🇰🇷</div>
-      <div class="stat-value" id="statDomestic">0</div>
-      <div class="stat-label">국내 스레드</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">🌍</div>
-      <div class="stat-value" id="statOverseas">0</div>
-      <div class="stat-label">해외 스레드</div>
-    </div>
-  </div>
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
 
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('feed')">📋 피드</button>
-    <button class="tab" onclick="switchTab('analytics')">📊 분석</button>
-  </div>
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
 
-  <div id="feedTab">
-    <div class="filters">
-      <div class="filter-group">
-        <button class="filter-btn active" onclick="setCategory('all',this)">전체</button>
-        <button class="filter-btn cat-shopping" onclick="setCategory('shopping',this)">🛒 쇼핑</button>
-        <button class="filter-btn cat-issue" onclick="setCategory('issue',this)">📰 이슈</button>
-        <button class="filter-btn cat-personal" onclick="setCategory('personal',this)">👤 퍼스널</button>
-      </div>
-      <div class="filter-group">
-        <button class="filter-btn active" onclick="setRegion('all',this)">전체</button>
-        <button class="filter-btn region-domestic" onclick="setRegion('domestic',this)">🇰🇷 국내</button>
-        <button class="filter-btn region-overseas" onclick="setRegion('overseas',this)">🌍 해외</button>
-      </div>
-      <div class="search-bar">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="키워드, 유저명으로 검색..." oninput="debounceSearch()">
-      </div>
-      <select class="sort-select" id="sortSelect" onchange="loadThreads()">
-        <option value="latest">최신순</option>
-        <option value="popular">인기순</option>
-        <option value="engagement">참여율순</option>
-        <option value="replies">댓글수순</option>
-      </select>
-    </div>
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
 
-    <div class="content-area">
-      <div class="feed">
-        <div class="feed-count" id="feedCount"></div>
-        <div id="threadList"></div>
-      </div>
-      <div class="sidebar">
-        <div class="sidebar-card">
-          <div class="sidebar-title">📊 카테고리 분포</div>
-          <div id="catChart"></div>
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .stat-change {
+            font-size: 12px;
+            color: #10b981;
+            margin-top: 8px;
+        }
+
+        /* Tier Distribution Bar */
+        .tier-bar-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .tier-bar-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1f2937;
+        }
+
+        .tier-bar-container {
+            display: flex;
+            height: 40px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            gap: 2px;
+        }
+
+        .tier-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tier-segment:hover {
+            filter: brightness(1.1);
+        }
+
+        .tier-under1k { background-color: #9ca3af; }
+        .tier-1k { background-color: #3b82f6; }
+        .tier-5k { background-color: #10b981; }
+        .tier-10k { background-color: #f59e0b; }
+        .tier-50k { background-color: #ef4444; }
+        .tier-100k { background-color: #8b5cf6; }
+
+        .tier-legend {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .tier-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tier-legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            min-width: 50px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #6b7280;
+        }
+
+        .filter-btn:hover {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .filter-btn.active {
+            background-color: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .filter-input {
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 13px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #10b981;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 24px;
+        }
+
+        /* Thread Feed */
+        .thread-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .thread-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+
+        .thread-card:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .thread-header {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: flex-start;
+        }
+
+        .thread-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            flex-shrink: 0;
+            font-size: 16px;
+        }
+
+        .thread-info {
+            flex: 1;
+        }
+
+        .thread-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .thread-username {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .thread-time {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .thread-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-category-shopping {
+            background-color: #fed7aa;
+            color: #92400e;
+        }
+
+        .badge-category-issue {
+            background-color: #bfdbfe;
+            color: #1e3a8a;
+        }
+
+        .badge-category-personal {
+            background-color: #e9d5ff;
+            color: #581c87;
+        }
+
+        .badge-region-domestic {
+            background-color: #fbcfe8;
+            color: #831843;
+        }
+
+        .badge-region-overseas {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-source {
+            background-color: #f3f4f6;
+            color: #6b7280;
+            font-size: 10px;
+        }
+
+        .badge-affiliate {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .thread-content {
+            margin: 12px 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #1f2937;
+        }
+
+        .thread-image {
+            width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin: 12px 0;
+            object-fit: cover;
+        }
+
+        .thread-metrics {
+            display: flex;
+            gap: 16px;
+            margin: 12px 0;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .metric-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .engagement-bar {
+            width: 100%;
+            height: 4px;
+            background-color: #e5e7eb;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .engagement-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #10b981);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+
+        .chart-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .chart-label {
+            font-size: 12px;
+            color: #6b7280;
+            min-width: 80px;
+        }
+
+        .chart-bar {
+            flex: 1;
+            height: 24px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0 8px;
+        }
+
+        .chart-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 4px;
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .chart-value {
+            font-size: 12px;
+            color: #1f2937;
+            font-weight: 600;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .region-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .region-card {
+            background: linear-gradient(135deg, #f0f9ff, #eff6ff);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #bfdbfe;
+        }
+
+        .region-card.domestic {
+            background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+            border-color: #fbcfe8;
+        }
+
+        .region-card.overseas {
+            background: linear-gradient(135deg, #dcfce7, #d1fae5);
+            border-color: #d1fae5;
+        }
+
+        .region-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .region-label {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .status-panel {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #10b981;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .status-label {
+            color: #6b7280;
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .status-running {
+            color: #10b981;
+        }
+
+        .status-waiting {
+            color: #6b7280;
+        }
+
+        .log-item {
+            font-size: 11px;
+            color: #6b7280;
+            padding: 4px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .log-item:last-child {
+            border-bottom: none;
+        }
+
+        .profile-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+        }
+
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background-color: #f9fafb;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .profile-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .profile-remove {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            transition: all 0.3s;
+        }
+
+        .profile-remove:hover {
+            transform: scale(1.2);
+        }
+
+        .profile-input-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        .profile-input-group input {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .profile-input-group input:focus {
+            outline: none;
+            border-color: #10b981;
+        }
+
+        .profile-input-group button {
+            padding: 6px 12px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .profile-input-group button:hover {
+            background-color: #2563eb;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+
+        .modal-body {
+            margin-bottom: 24px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-result {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #15803d;
+            display: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f4f6;
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .pagination button:hover {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .pagination button.active {
+            background-color: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+
+            .filter-row {
+                flex-direction: column;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+
+            .filter-input {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .stats-row {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .filter-row {
+                flex-direction: column;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-section">
+                <div class="logo">🧵</div>
+                <div class="logo-text">
+                    <h1>ThreadsCollector</h1>
+                    <p>Meta Threads 빅데이터 수집 & 분석 플랫폼</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    <span id="statusText">실시간 수집 활성</span>
+                </div>
+                <span style="font-size: 12px; color: #9ca3af;" id="lastCollectionTime">마지막 수집: 방금 전</span>
+                <button class="btn btn-primary" onclick="openScrapeModal()">수집하기</button>
+            </div>
         </div>
-        <div class="sidebar-card">
-          <div class="sidebar-title">🌏 국내/해외 분포</div>
-          <div class="region-summary" id="regionChart"></div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">📊 총 수집 스레드</div>
+                <div class="stat-value" id="totalThreads">0</div>
+                <div class="stat-change">↑ 1.2% 증가</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">📅 오늘 수집</div>
+                <div class="stat-value" id="todayThreads">0</div>
+                <div class="stat-change">↑ 2.8% 증가</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">🇰🇷 국내 스레드</div>
+                <div class="stat-value" id="domesticThreads">0</div>
+                <div class="stat-change">↑ 0.5% 증가</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">🌐 해외 스레드</div>
+                <div class="stat-value" id="overseasThreads">0</div>
+                <div class="stat-change">↑ 3.2% 증가</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">🔗 제휴 링크 감지</div>
+                <div class="stat-value" id="affiliateCount">0</div>
+                <div class="stat-change">↑ 5.1% 증가</div>
+            </div>
         </div>
-      </div>
+
+        <!-- Tier Distribution Bar -->
+        <div class="tier-bar-section">
+            <div class="tier-bar-title">조회수 티어 분포</div>
+            <div class="tier-bar-container" id="tierBarContainer"></div>
+            <div class="tier-legend" id="tierLegend"></div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <span class="filter-label">카테고리</span>
+                    <button class="filter-btn active" onclick="setCategory('all')">전체</button>
+                    <button class="filter-btn" onclick="setCategory('shopping')">🛒 쇼핑</button>
+                    <button class="filter-btn" onclick="setCategory('issue')">📰 이슈</button>
+                    <button class="filter-btn" onclick="setCategory('personal')">👤 퍼스널</button>
+                </div>
+            </div>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <span class="filter-label">지역</span>
+                    <button class="filter-btn active" onclick="setRegion('all')">전체</button>
+                    <button class="filter-btn" onclick="setRegion('domestic')">🇰🇷 국내</button>
+                    <button class="filter-btn" onclick="setRegion('overseas')">🌐 해외</button>
+                </div>
+            </div>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <span class="filter-label">티어</span>
+                    <select class="filter-select" id="tierFilter" onchange="setViewTier(this.value)">
+                        <option value="all">전체</option>
+                        <option value="1k">1K+</option>
+                        <option value="5k">5K+</option>
+                        <option value="10k">1만+</option>
+                        <option value="50k">5만+</option>
+                        <option value="100k">10만+</option>
+                    </select>
+                </div>
+                <div class="filter-group" style="flex: 1;">
+                    <input type="text" class="filter-input" id="searchInput" placeholder="키워드 또는 사용자명 검색..." onkeyup="debounceSearch()">
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">정렬</span>
+                    <select class="filter-select" id="sortFilter" onchange="setSort(this.value)">
+                        <option value="latest">최신순</option>
+                        <option value="popular">인기순</option>
+                        <option value="views">조회순</option>
+                        <option value="replies">댓글순</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Thread Feed -->
+            <div class="thread-feed" id="threadFeed"></div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Category Distribution -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">📊 카테고리 분포</div>
+                    <div id="categoryChart"></div>
+                </div>
+
+                <!-- Region Distribution -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">📍 국내/해외 분포</div>
+                    <div class="region-cards">
+                        <div class="region-card domestic">
+                            <div class="region-value" id="sidebarDomestic">0</div>
+                            <div class="region-label">국내</div>
+                        </div>
+                        <div class="region-card overseas">
+                            <div class="region-value" id="sidebarOverseas">0</div>
+                            <div class="region-label">해외</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View Tier Distribution -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">👁️ 조회수 분포</div>
+                    <div id="tierChart"></div>
+                </div>
+
+                <!-- Auto Collect Status -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">🤖 자동 수집 상태</div>
+                    <div class="status-panel">
+                        <div class="status-row">
+                            <span class="status-label">상태</span>
+                            <span class="status-value status-running" id="collectStatus">실행중</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">마지막 수집</span>
+                            <span class="status-value" id="lastCollect">방금 죄</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">다음 수집</span>
+                            <span class="status-value" id="nextCollect">5분 후</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">수집 통계</span>
+                            <span class="status-value" id="collectStats">총 1,234건</span>
+                        </div>
+                        <div style="margin-top: 8px; border-top: 1px solid #e5e7eb; padding-top: 8px;">
+                            <div class="sidebar-title" style="margin-bottom: 6px;">최근 로그</div>
+                            <div id="collectLogs">
+                                <div class="log-item">✓ 프로필 @user1 수집 완료</div>
+                                <div class="log-item">✓ 키워드 "패션" 수집 완료</div>
+                                <div class="log-item">⏳ @user2 수집 중...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tracked Profiles -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">👤 추적 프로필</div>
+                    <div class="profile-list" id="profileList">
+                        <div class="profile-item">
+                            <span class="profile-name">@user1</span>
+                            <button class="profile-remove" onclick="removeProfile('user1')">✕</button>
+                        </div>
+                        <div class="profile-item">
+                            <span class="profile-name">@user2</span>
+                            <button class="profile-remove" onclick="removeProfile('user2')">✕</button>
+                        </div>
+                    </div>
+                    <div class="profile-input-group">
+                        <input type="text" id="profileInput" placeholder="사용자명 입력">
+                        <button onclick="addProfile()">추가</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
     </div>
-  </div>
 
-  <div id="analyticsTab" style="display:none">
-    <div class="analytics-grid">
-      <div class="analytics-card">
-        <h3>😀 감정 분석 요약</h3>
-        <div id="sentimentChart"></div>
-      </div>
-      <div class="analytics-card">
-        <h3>📁 서브 카테고리별 수집 현황</h3>
-        <div id="subcatChart"></div>
-      </div>
+    <!-- Scrape Modal -->
+    <div class="modal" id="scrapeModal">
+        <div class="modal-content">
+            <div class="modal-header">🧵 새로운 스레드 수집</div>
+            <div class="modal-body">
+                <div class="modal-result" id="scrapeResult"></div>
+                <input type="text" class="modal-input" id="scrapeInput" placeholder="사용자명을 쉼표로 구분하여 입력 (예: @user1, @user2)">
+                <label style="font-size: 12px; color: #6b7280;">
+                    <input type="checkbox" id="autoAddProfile" checked> 프로필 자동 추적에 추가
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeScrapeModal()">취셬</button>
+                <button class="btn btn-primary" id="scrapeBtn" onclick="startScrape()">
+                    <span>수집 시작</span>
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
-</div>
 
-<div class="token-modal" id="collectModal">
-  <div class="token-dialog">
-    <h3>🧵 스레드 수집하기</h3>
-    <p>수집할 Threads 유저명을 입력하세요. 여러 명은 쉼표(,)로 구분합니다.<br>예: zuck, mosseri, threads</p>
-    <input type="text" id="usernameInput" placeholder="유저명 입력 (예: zuck, mosseri)">
-    <p style="font-size:11px;color:#999;margin-top:-8px">ℹ️ 공개 프로필의 스레드를 Playwright로 수집합니다. 무료이며 API 토큰이 필요없습니다.</p>
-    <div class="btn-row">
-      <button class="btn btn-cancel" onclick="hideCollectModal()">취소</button>
-      <button class="btn btn-save" onclick="startScrape()">수집 시작</button>
-    </div>
-    <div id="scrapeStatus" style="margin-top:12px;font-size:13px;display:none"></div>
-  </div>
-</div><script>
-let currentCategory = 'all';
-let currentRegion = 'all';
-let searchTimer = null;
+    <script>
+        // ============ State ============
+        let currentCategory = 'all';
+        let currentRegion = 'all';
+        let currentViewTier = 'all';
+        let currentSearch = '';
+        let currentSort = 'latest';
+        let currentPage = 1;
+        let searchTimeout;
 
+        // ============ Mock Data ============
+        const mockStats = {
+            total: 45230,
+            today: 1234,
+            domestic: 28450,
+            overseas: 16780,
+            affiliateCount: 3421,
+            viewTierDist: {
+                under1k: 12000,
+                '1k': 15000,
+                '5k': 10000,
+                '10k': 5000,
+                '50k': 2500,
+                '100k': 730
+            },
+            byCat: {
+                shopping: 18000,
+                issue: 15000,
+                personal: 12230
+            }
+        };
 
-function timeAgo(date) {
-  const d = new Date(date);
-  const now = new Date();
-  const diff = Math.floor((now - d) / 60000);
-  if (diff < 1) return '방금';
-  if (diff < 60) return diff + '분 전';
-  const h = Math.floor(diff / 60);
-  if (h < 24) return h + '시간 전';
-  const days = Math.floor(h / 24);
-  return days + '일 전';
-}
+        const mockThreads = [
+            {
+                threadId: 1,
+                author: 'fashion_blogger',
+                content: '새 시즌 트렌드 패션 아이템 추천! 이 드레스는 정말 amazing... 클릭하면 20% 할인 받을 수 있어요!',
+                category: 'shopping',
+                region: 'domestic',
+                viewTier: '10k',
+                affiliate: { detected: true, platform: 'Coupang' },
+                metrics: { likes: 2340, replies: 156, reposts: 234, views: 12450 },
+                collectionSource: 'auto_keyword',
+                image: null,
+                publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+            },
+            {
+                threadId: 2,
+                author: 'tech_news_daily',
+                content: '인공지능 규제 노의 '과도하면 혁신 저해' 논쟁 가열... 전문가들의 의견을 들어봤습니다.',
+                category: 'issue',
+                region: 'domestic',
+                viewTier: '50k',
+                affiliate: { detected: false },
+                metrics: { likes: 5670, replies: 890, reposts: 1230, views: 65340 },
+                collectionSource: 'auto_profile',
+                image: null,
+                publishedAt: new Date(Date.now() - 4 * 60 * 60 * 1000)
+            },
+            {
+                threadId: 3,
+                author: 'morning_thoughts',
+                content: '아침에 일어나서 창밖을 봤는데 날씨가 정말 좋네요. 오늘 하루도 화이팅! 💪',
+                category: 'personal',
+                region: 'domestic',
+                viewTier: '1k',
+                affiliate: { detected: false },
+                metrics: { likes: 234, replies: 45, reposts: 12, views: 876 },
+                collectionSource: 'manual',
+                image: null,
+                publishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000)
+            },
+            {
+                threadId: 4,
+                author: 'beauty_expert',
+                content: '요즘 가장 핫한 뷰티 트렌드 TOP 5! 이 제품들을 사용하면 정말 피봀가 좋아져요. 아마존에서 질금 세일중!',
+                category: 'shopping',
+                region: 'overseas',
+                viewTier: '100k',
+                affiliate: { detected: true, platform: 'Amazon' },
+                metrics: { likes: 8900, replies: 1234, reposts: 2100, views: 156789 },
+                collectionSource: 'auto_profile',
+                image: null,
+                publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000)
+            },
+            {
+                threadId: 5,
+                author: 'economy_watcher',
+                content: '달러 환율이 급등했습니다. 경제 전문가들은 이것이 일시적이라고 분석하고 있습니다.',
+                category: 'issue',
+                region: 'domestic',
+                viewTier: '5k',
+                affiliate: { detected: false },
+                metrics: { likes: 3450, replies: 567, reposts: 890, views: 23456 },
+                collectionSource: 'auto_keyword',
+                image: null,
+                publishedAt: new Date(Date.now() - 10 * 60 * 60 * 1000)
+            }
+        ];
 
-function formatNum(n) {
-  if (!n) return '0';
-  if (n >= 10000) return (n/10000).toFixed(1) + '만';
-  if (n >= 1000) return (n/1000).toFixed(1) + '천';
-  return n.toString();
-}
+        // ============ Utility Functions ============
+        function timeAgo(date) {
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
 
-function switchTab(tab) {
-  document.getElementById('feedTab').style.display = tab === 'feed' ? '' : 'none';
-  document.getElementById('analyticsTab').style.display = tab === 'analytics' ? '' : 'none';
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', (tab === 'feed' && i === 0) || (tab === 'analytics' && i === 1));
-  });
-}
+            if (seconds < 60) return '방금 전';
+            if (seconds < 3600) return Math.floor(seconds / 60) + '분 전';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + '시간 전';
+            if (seconds < 604800) return Math.floor(seconds / 86400) + '일 전';
+            return date.toLocaleDateString('ko-KR');
+        }
 
-function setCategory(cat, el) {
-  currentCategory = cat;
-  el.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  loadThreads();
-}
+        function formatNumber(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + '백만';
+            if (n >= 100000) return (n / 100000).toFixed(1) + '십만';
+            if (n >= 10000) return (n / 10000).toFixed(1) + '만';
+            if (n >= 1000) return (n / 1000).toFixed(1) + '천';
+            return n.toString();
+        }
 
-function setRegion(region, el) {
-  currentRegion = region;
-  el.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  loadThreads();
-}
+        function getCategoryBadge(cat) {
+            const badges = {
+                shopping: { class: 'badge-category-shopping', text: '🛒 쇼핑' },
+                issue: { class: 'badge-category-issue', text: '📰 이슈' },
+                personal: { class: 'badge-category-personal', text: '👤 퍼스널' }
+            };
+            return badges[cat] || { class: '', text: cat };
+        }
 
-function debounceSearch() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => loadThreads(), 300);
-}
+        function getRegionBadge(region) {
+            return region === 'domestic'
+                ? { class: 'badge-region-domestic', text: '🇰🇷 국내' }
+                : { class: 'badge-region-overseas', text: '🌐 해외' };
+        }
 
-function showCollectModal() { document.getElementById('collectModal').classList.add('show'); }
-function hideCollectModal() { document.getElementById('collectModal').classList.remove('show'); }
+        function getTierBadge(tier) {
+            const badges = {
+                under1k: { color: '#9ca3af', text: '1K 미만' },
+                '1k': { color: '#3b82f6', text: '1K+' },
+                '5k': { color: '#10b981', text: '5K+' },
+                '10k': { color: '#f59e0b', text: '1만+' },
+                '50k': { color: '#ef4444', text: '5만+' },
+                '100k': { color: '#8b5cf6', text: '10만+' }
+            };
+            const badge = badges[tier] || badges.under1k;
+            return `<span class="badge" style="background-color: ${badge.color}20; color: ${badge.color};">${badge.text}</span>`;
+        }
 
-async function runCollect() { showCollectModal(); }
+        function getSourceBadge(source) {
+            const badges = {
+                auto_keyword: '자동(키워드)',
+                auto_profile: '자동(프로필)',
+                manual: '수동'
+            };
+            return badges[source] || source;
+        }
 
-async function startScrape() {
-  const input = document.getElementById('usernameInput').value.trim();
-  if (!input) { alert('유저명을 입력해주세요.'); return; }
-  const usernames = input.split(',').map(u => u.trim().replace('@','')).filter(Boolean);
-  if (usernames.length === 0) { alert('유저명을 입력해주세요.'); return; }
-  
-  const status = document.getElementById('scrapeStatus');
-  status.style.display = 'block';
-  status.innerHTML = '⏳ ' + usernames.join(', ') + ' 수집 중... (최대 30초 소요)';
-  status.style.color = '#1a1a2e';
-  
-  try {
-    const res = await fetch('/api/collector/scrape', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usernames })
-    });
-    const data = await res.json();
-    if (data.success) {
-      status.innerHTML = '✅ ' + data.message;
-      status.style.color = '#10b981';
-      let detail = '';
-      if (data.details) {
-        data.details.forEach(d => {
-          detail += '<br>@' + d.username + ': ' + d.found + '개 발견, ' + d.saved + '개 저장';
+        // ============ Filter Functions ============
+        function setCategory(cat) {
+            currentCategory = cat;
+            currentPage = 1;
+            document.querySelectorAll('.filter-btn').forEach((btn, i) => {
+                if (i < 4) {
+                    btn.classList.toggle('active', (i === 0 && cat === 'all') ||
+                        (i === 1 && cat === 'shopping') ||
+                        (i === 2 && cat === 'issue') ||
+                        (i === 3 && cat === 'personal'));
+                }
+            });
+            loadThreads();
+        }
+
+        function setRegion(region) {
+            currentRegion = region;
+            currentPage = 1;
+            const btns = document.querySelectorAll('.filter-btn');
+            btns[4]?.classList.toggle('active', region === 'all');
+            btns[5]?.classList.toggle('active', region === 'domestic');
+            btns[6]?.classList.toggle('active', region === 'overseas');
+            loadThreads();
+        }
+
+        function setViewTier(tier) {
+            currentViewTier = tier;
+            currentPage = 1;
+            loadThreads();
+        }
+
+        function setSort(sort) {
+            currentSort = sort;
+            currentPage = 1;
+            loadThreads();
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentSearch = document.getElementById('searchInput').value;
+                currentPage = 1;
+                loadThreads();
+            }, 500);
+        }
+
+        // ============ Data Loading ============
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                renderStats(data);
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadThreads() {
+            try {
+                const params = new URLSearchParams({
+                    category: currentCategory,
+                    region: currentRegion,
+                    viewTier: currentViewTier,
+                    search: currentSearch,
+                    sort: currentSort,
+                    page: currentPage
+                });
+                const response = await fetch(`/api/threads?${params}`);
+                const data = await response.json();
+                renderThreads(data);
+            } catch (error) {
+                console.error('Error loading threads:', error);
+            }
+        }
+
+        async function loadCollectorStatus() {
+            try {
+                const response = await fetch('/api/collector/status');
+                const data = await response.json();
+                renderCollectorStatus(data);
+            } catch (error) {
+                console.error('Error loading collector status:', error);
+            }
+        }
+
+        async function loadProfiles() {
+            try {
+                const response = await fetch('/api/collector/profiles');
+                const data = await response.json();
+                renderProfiles(data.profiles || data || []);
+            } catch (error) {
+                console.error('Error loading profiles:', error);
+            }
+        }
+
+        // ============ Render Functions ============
+        function renderStats(data) {
+            document.getElementById('totalThreads').textContent = formatNumber(data.total);
+            document.getElementById('todayThreads').textContent = formatNumber(data.today);
+            document.getElementById('domesticThreads').textContent = formatNumber(data.domestic);
+            document.getElementById('overseasThreads').textContent = formatNumber(data.overseas);
+            document.getElementById('affiliateCount').textContent = formatNumber(data.affiliateCount);
+
+            document.getElementById('sidebarDomestic').textContent = formatNumber(data.domestic);
+            document.getElementById('sidebarOverseas').textContent = formatNumber(data.overseas);
+
+            // Tier Bar
+            const total = Object.values(data.viewTierDist).reduce((a, b) => a + b, 0);
+            const tierNames = { under1k: '1K 미만', '1k': '1K+', '5k': '5K+', '10k': '1만+', '50k': '5만+', '100k': '10만+' };
+            const tierColors = { under1k: 'tier-under1k', '1k': 'tier-1k', '5k': 'tier-5k', '10k': 'tier-10k', '50k': 'tier-50k', '100k': 'tier-100k' };
+
+            let tierBar = '';
+            let tierLegend = '';
+            Object.entries(data.viewTierDist).forEach(([key, count]) => {
+                const percent = ((count / total) * 100).toFixed(1);
+                const width = percent;
+                tierBar += `<div class="tier-segment ${tierColors[key]}" style="flex: ${width};">${formatNumber(count)}</div>`;
+                tierLegend += `<div class="tier-legend-item"><div class="tier-legend-color ${tierColors[key]}"></div><span>${tierNames[key]}: ${formatNumber(count)} (${percent}%)</span></div>`;
+            });
+            document.getElementById('tierBarContainer').innerHTML = tierBar;
+            document.getElementById('tierLegend').innerHTML = tierLegend;
+
+            // Category Chart
+            let catChart = '';
+            Object.entries(data.byCat).forEach(([cat, count]) => {
+                const catName = { shopping: '🛒 쇼핑', issue: '📰 이슈', personal: '👤 퍼스널' }[cat];
+                const percent = ((count / data.total) * 100).toFixed(1);
+                catChart += `
+                    <div class="chart-item">
+                        <div class="chart-label">${catName}</div>
+                        <div class="chart-bar">
+                            <div class="chart-fill" style="width: ${percent}%;">${percent}%</div>
+                        </div>
+                        <div class="chart-value">${formatNumber(count)}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('categoryChart').innerHTML = catChart;
+
+            // Tier Chart
+            let tierChart = '';
+            Object.entries(data.viewTierDist).forEach(([tier, count]) => {
+                const tierName = { under1k: '1K 미만', '1k': '1K+', '5k': '5K+', '10k': '1만+', '50k': '5만+', '100k': '10만+' }[tier];
+                const percent = ((count / total) * 100).toFixed(1);
+                tierChart += `
+                    <div class="chart-item">
+                        <div class="chart-label">${tierName}</div>
+                        <div class="chart-bar">
+                            <div class="chart-fill" style="width: ${percent}%; background: linear-gradient(90deg, #3b82f6, #10b981);">${percent}%</div>
+                        </div>
+                        <div class="chart-value">${formatNumber(count)}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('tierChart').innerHTML = tierChart;
+        }
+
+        function renderThreads(data) {
+            let html = '';
+            const threads = data.threads || [];
+            document.getElementById('threadCount').textContent = `${data.total || threads.length}개 스레드 표시 중`;
+
+            threads.forEach(thread => {
+                const username = thread.author?.username || 'unknown';
+                const catPrimary = thread.category?.primary || 'uncategorized';
+                const catBadge = getCategoryBadge(catPrimary);
+                const regionBadge = getRegionBadge(thread.region);
+                const timeDiff = timeAgo(thread.publishedAt);
+                const metrics = thread.metrics || {};
+                const engagement = (metrics.likes||0) + (metrics.replies||0) + (metrics.reposts||0);
+                const maxEngagement = 10000;
+                const engagementPercent = Math.min((engagement / maxEngagement) * 100, 100);
+                const contentText = thread.content?.text || '';
+                const thumbnailUrl = thread.content?.thumbnailUrl || '';
+                const hasAffiliate = thread.affiliate?.hasAffiliate || false;
+                const affPlatform = hasAffiliate && thread.affiliate?.links?.length > 0 ? thread.affiliate.links[0].platform : '';
+                const profilePic = thread.author?.profilePicUrl || '';
+                const avatarHtml = profilePic
+                    ? `<img src="${profilePic}" class="thread-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='<div class=\\'thread-avatar\\'>${username.charAt(0).toUpperCase()}</div>'">`
+                    : `<div class="thread-avatar">${username.charAt(0).toUpperCase()}</div>`;
+
+                html += `
+                    <div class="thread-card">
+                        <div class="thread-header">
+                            ${avatarHtml}
+                            <div class="thread-info">
+                                <div class="thread-meta">
+                                    <span class="thread-username">@${username}</span>
+                                    <span class="thread-time">${timeDiff}</span>
+                                </div>
+                                <div class="thread-badges">
+                                    <span class="badge ${catBadge.class}">${catBadge.text}</span>
+                                    <span class="badge ${regionBadge.class}">${regionBadge.text}</span>
+                                    ${getTierBadge(thread.viewTier)}
+                                    <span class="badge badge-source">${getSourceBadge(thread.collectionSource)}</span>
+                                    ${hasAffiliate ? `<span class="badge badge-affiliate">🔗 ${affPlatform || '제휴링크'}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="thread-content">${contentText}</div>
+                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" class="thread-image" alt="스레드 이미지" onerror="this.style.display='none'">` : ''}
+                        <div class="thread-metrics">
+                            <div class="metric-item">❤️ ${formatNumber(metrics.likes||0)}</div>
+                            <div class="metric-item">💬 ${formatNumber(metrics.replies||0)}</div>
+                            <div class="metric-item">🔄 ${formatNumber(metrics.reposts||0)}</div>
+                            <div class="metric-item">👁️ ${formatNumber(metrics.views||0)}</div>
+                        </div>
+                        <div class="engagement-bar">
+                            <div class="engagement-fill" style="width: ${engagementPercent}%;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('threadFeed').innerHTML = html || '<div style="text-align: center; padding: 40px; color: #9ca3af;">검색 결과가 없습니다.</div>';
+            renderPagination(data.page || 1, data.pages || 1);
+        }
+
+        function renderCollectorStatus(data) {
+            const isRunning = data.isRunning || false;
+            document.getElementById('collectStatus').textContent = isRunning ? '실행중' : '대기중';
+            document.getElementById('collectStatus').className = isRunning ? 'status-value status-running' : 'status-value status-waiting';
+            document.getElementById('lastCollect').textContent = data.lastRunAt ? timeAgo(data.lastRunAt) : '없음';
+            document.getElementById('nextCollect').textContent = data.nextRunAt ? timeAgo(data.nextRunAt) : '대기중';
+            document.getElementById('collectStats').textContent = '총 ' + formatNumber(data.stats?.totalCollected || data.totalCollected || 0) + '건';
+
+            let logs = '';
+            const recentLogs = data.recentLogs || data.logs || [];
+            recentLogs.slice(0, 5).forEach(log => {
+                const msg = typeof log === 'string' ? log : `${log.type === 'error' ? '❌' : '✓'} ${log.message || log}`;
+                logs += `<div class="log-item">${msg}</div>`;
+            });
+            document.getElementById('collectLogs').innerHTML = logs || '<div class="log-item">아직 수집 기록이 없습니다.</div>';
+        }
+
+        function renderProfiles(profiles) {
+            let html = '';
+            profiles.forEach(profile => {
+                html += `
+                    <div class="profile-item">
+                        <span class="profile-name">@${profile}</span>
+                        <button class="profile-remove" onclick="removeProfile('${profile}')">✕</button>
+                    </div>
+                `;
+            });
+            document.getElementById('profileList').innerHTML = html;
+        }
+
+        function renderPagination(page, pages) {
+            let html = '';
+            if (page > 1) {
+                html += `<button onclick="goToPage(${page - 1})">이전</button>`;
+            }
+            for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++) {
+                html += `<button class="${i === page ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+            if (page < pages) {
+                html += `<button onclick="goToPage(${page + 1})">다음</button>`;
+            }
+            document.getElementById('pagination').innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadThreads();
+            window.scrollTo(0, 0);
+        }
+
+        // ============ Modal Functions ============
+        function openScrapeModal() {
+            document.getElementById('scrapeModal').classList.add('active');
+            document.getElementById('scrapeInput').value = '';
+            document.getElementById('scrapeResult').style.display = 'none';
+        }
+
+        function closeScrapeModal() {
+            document.getElementById('scrapeModal').classList.remove('active');
+        }
+
+        async function startScrape() {
+            const input = document.getElementById('scrapeInput').value.trim();
+            if (!input) {
+                alert('사용자명을 입력해주세요.');
+                return;
+            }
+
+            const btn = document.getElementById('scrapeBtn');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-spinner"></span><span>수집 중...</span>';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/collector/scrape', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames: input.split(',').map(u => u.trim()) })
+                });
+                const data = await response.json();
+
+                const result = document.getElementById('scrapeResult');
+                result.textContent = '✓ ' + data.message;
+                result.style.display = 'block';
+
+                if (document.getElementById('autoAddProfile').checked) {
+                    input.split(',').forEach(username => {
+                        const name = username.trim().replace('@', '');
+                        addProfile(name);
+                    });
+                }
+
+                setTimeout(() => {
+                    closeScrapeModal();
+                    loadStats();
+                    loadThreads();
+                }, 1500);
+            } catch (error) {
+                alert('수집 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+
+        async function addProfile(username) {
+            const input = document.getElementById('profileInput');
+            const name = username || input.value.trim().replace('@', '');
+
+            if (!name) {
+                alert('사용자명을 입력해주세요.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/collector/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: name })
+                });
+                const data = await response.json();
+                loadProfiles();
+                if (input) input.value = '';
+            } catch (error) {
+                console.error('Error adding profile:', error);
+            }
+        }
+
+        async function removeProfile(username) {
+            try {
+                await fetch(`/api/collector/profiles/${username}`, { method: 'DELETE' });
+                loadProfiles();
+            } catch (error) {
+                console.error('Error removing profile:', error);
+            }
+        }
+
+        // ============ Initialization ============
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadThreads();
+            loadCollectorStatus();
+            loadProfiles();
+
+            // Auto-refresh every 60 seconds
+            setInterval(() => {
+                loadStats();
+                loadCollectorStatus();
+            }, 60000);
+
+            // Close modal on outside click
+            document.getElementById('scrapeModal').addEventListener('click', (e) => {
+                if (e.target.id === 'scrapeModal') {
+                    closeScrapeModal();
+                }
+            });
         });
-      }
-      status.innerHTML += detail;
-      setTimeout(() => { hideCollectModal(); loadAll(); }, 3000);
-    } else {
-      status.innerHTML = '❌ ' + data.message;
-      status.style.color = '#ef4444';
-    }
-  } catch (e) {
-    status.innerHTML = '❌ 오류: ' + e.message;
-    status.style.color = '#ef4444';
-  }
-}
-
-async function loadStats() {
-  try {
-    const res = await fetch('/api/stats');
-    const s = await res.json();
-    document.getElementById('statTotal').textContent = s.total;
-    document.getElementById('statToday').textContent = s.today;
-    document.getElementById('statDomestic').textContent = s.domestic || 0;
-    document.getElementById('statOverseas').textContent = s.overseas || 0;
-    document.getElementById('totalBadge').textContent = s.total + '개 수집됨';
-    document.getElementById('lastUpdate').textContent = '마지막: ' + new Date().toLocaleTimeString('ko-KR');
-
-    // Category chart
-    const cats = s.byCat || {};
-    const total = s.total || 1;
-    let catHtml = '';
-    const catNames = { shopping: '쇼핑', issue: '이슈', personal: '퍼스널' };
-    const catColors = { shopping: '#f59e0b', issue: '#3b82f6', personal: '#8b5cf6' };
-    ['shopping','issue','personal'].forEach(c => {
-      const count = cats[c] || 0;
-      const pct = Math.round(count / total * 100);
-      catHtml += '<div class="cat-bar"><span class="cat-bar-label">' + catNames[c] + '</span><div class="cat-bar-track"><div class="cat-bar-fill ' + c + '" style="width:' + pct + '%"></div></div><span class="cat-bar-count">' + count + '개 (' + pct + '%)</span></div>';
-    });
-    document.getElementById('catChart').innerHTML = catHtml;
-
-    // Region chart
-    document.getElementById('regionChart').innerHTML =
-      '<div class="region-box domestic"><div class="region-count">' + (s.domestic||0) + '</div><div class="region-label">🇰🇷 국내</div></div>' +
-      '<div class="region-box overseas"><div class="region-count">' + (s.overseas||0) + '</div><div class="region-label">🌍 해외</div></div>';
-
-    // Sentiment chart
-    const sent = s.bySentiment || {};
-    const sentTotal = Object.values(sent).reduce((a,b)=>a+b, 0) || 1;
-    let sentHtml = '';
-    const sentNames = { positive: '긍정', neutral: '중립', negative: '부정' };
-    ['positive','neutral','negative'].forEach(s2 => {
-      const count = sent[s2] || 0;
-      const pct = Math.round(count / sentTotal * 100);
-      sentHtml += '<div class="sentiment-row"><span class="label">' + sentNames[s2] + '</span><div class="bar"><div class="fill ' + s2 + '" style="width:' + pct + '%"></div></div><span>' + count + '개 (' + pct + '%)</span></div>';
-    });
-    document.getElementById('sentimentChart').innerHTML = sentHtml;
-  } catch (e) { console.error('Stats error:', e); }
-}
-
-function renderThread(t) {
-  const isDeleted = t.deletion && t.deletion.isDeleted;
-  const catClass = 'cat-' + (t.category?.primary || 'uncategorized');
-  const regionLabel = t.region === 'overseas' ? '해외' : '국내';
-  const regionClass = t.region === 'overseas' ? 'badge-overseas' : 'badge-domestic';
-  const regionFlag = t.region === 'overseas' ? '🌍' : '🇰🇷';
-
-  const catNames = { shopping: '쇼핑', issue: '이슈', personal: '퍼스널', uncategorized: '미분류' };
-  const catBadgeClass = { shopping: 'badge-shopping', issue: 'badge-issue', personal: 'badge-personal' };
-
-  let html = '<div class="thread-card ' + catClass + (isDeleted ? ' deleted' : '') + '">';
-  html += '<div class="card-header"><div class="author-info">';
-  html += '<div class="avatar">' + (t.author?.profilePicUrl ? '<img src="' + t.author.profilePicUrl + '" alt="">' : '') + '</div>';
-  html += '<div><div class="author-name">@' + (t.author?.username || 'unknown') + '</div>';
-  html += '<div class="author-time">' + timeAgo(t.publishedAt || t.collectedAt) + '</div></div></div>';
-  html += '<div class="card-badges">';
-  html += '<span class="badge badge-region ' + regionClass + '">' + regionFlag + ' ' + regionLabel + '</span>';
-  html += '<span class="badge ' + (catBadgeClass[t.category?.primary] || 'badge-cat') + '">' + (catNames[t.category?.primary] || '미분류') + '</span>';
-  if (t.category?.sub) html += '<span class="badge badge-sub">' + t.category.sub + '</span>';
-  if (t.author?.isVerified) html += '<span class="badge badge-verified">✓ 인증</span>';
-  if (t.affiliate?.hasAffiliate) html += '<span class="badge badge-affiliate">💰 제휴링크</span>';
-  if (isDeleted) html += '<span class="badge badge-deleted">🗑 삭제됨</span>';
-  html += '</div></div>';
-
-  if (isDeleted) {
-    html += '<div class="deleted-notice">⚠️ 삭제된 콘텐츠 - 원본 작성자가 ' + timeAgo(t.deletion.deletedAt) + ' 삭제함 (DB 보관 중)</div>';
-  }
-
-  html += '<div class="card-text">' + (t.content?.text || '') + '</div>';
-
-  if (t.content?.thumbnailUrl) {
-    html += '<div class="card-media"><img src="' + t.content.thumbnailUrl + '" alt="" loading="lazy">';
-    if (t.content.mediaType === 'video') html += '<span class="video-badge">▶ 동영상</span>';
-    if (t.content.mediaType === 'carousel' && t.content.mediaUrls?.length > 1) {
-      html += '<div class="carousel-dots">';
-      t.content.mediaUrls.forEach((_, i) => { html += '<span class="carousel-dot' + (i===0?' active':'') + '"></span>'; });
-      html += '</div>';
-    }
-    html += '</div>';
-  }
-
-  if (t.affiliate?.hasAffiliate && t.affiliate.links?.length) {
-    t.affiliate.links.forEach(l => {
-      html += '<div class="affiliate-url">🔗 ' + (l.shortUrl || l.url || '') + '</div>';
-    });
-  }
-
-  const eng = t.metrics?.engagementRate || 0;
-  const engClass = eng >= 80 ? 'high' : eng >= 50 ? 'mid' : 'low';
-  html += '<div class="card-footer"><div class="metrics">';
-  html += '<span class="metric">❤️ ' + formatNum(t.metrics?.likes) + '</span>';
-  html += '<span class="metric">💬 ' + formatNum(t.metrics?.replies) + '</span>';
-  html += '<span class="metric">🔁 ' + formatNum(t.metrics?.reposts) + '</span>';
-  html += '</div><div class="sentiment-bar">';
-  html += '<span class="sentiment-dot ' + (t.analysis?.sentiment || 'neutral') + '"></span>';
-  html += '<div class="engagement-bar"><div class="engagement-fill ' + engClass + '" style="width:' + eng + '%"></div></div>';
-  html += '<span style="font-size:11px;color:#999">' + eng + '%</span>';
-  html += '</div></div></div>';
-  return html;
-}
-
-async function loadThreads() {
-  try {
-    const search = document.getElementById('searchInput').value;
-    const sort = document.getElementById('sortSelect').value;
-    let url = '/api/threads?sort=' + sort + '&includeDeleted=true';
-    if (currentCategory !== 'all') url += '&category=' + currentCategory;
-    if (currentRegion !== 'all') url += '&region=' + currentRegion;
-    if (search) url += '&search=' + encodeURIComponent(search);
-
-    const res = await fetch(url);
-    const data = await res.json();
-    const list = document.getElementById('threadList');
-    document.getElementById('feedCount').textContent = data.total + '개 스레드 표시 중';
-
-    if (!data.threads?.length) {
-      list.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>수집된 스레드가 없습니다.<br>수집하기 버튼을 눌러 데이터를 수집해보세요.</p></div>';
-      return;
-    }
-    list.innerHTML = data.threads.map(renderThread).join('');
-  } catch (e) { console.error('Threads error:', e); }
-}
-
-async function loadSubcats() {
-  try {
-    const res = await fetch('/api/threads?limit=200&includeDeleted=true');
-    const data = await res.json();
-    const threads = data.threads || [];
-    const cats = { shopping: {}, issue: {}, personal: {} };
-    threads.forEach(t => {
-      const p = t.category?.primary;
-      const s = t.category?.sub || '미분류';
-      if (cats[p]) { cats[p][s] = (cats[p][s] || 0) + 1; }
-    });
-    const catNames = { shopping: '쇼핑', issue: '이슈', personal: '퍼스널' };
-    const catColors = { shopping: '#fef3c7', issue: '#dbeafe', personal: '#ede9fe' };
-    let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
-    ['shopping','issue','personal'].forEach(cat => {
-      html += '<div style="background:' + catColors[cat] + ';border-radius:8px;padding:12px"><h4 style="font-size:13px;margin-bottom:8px">' + catNames[cat] + '</h4><div class="subcat-list">';
-      const items = cats[cat];
-      Object.entries(items).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => {
-        html += '<div class="subcat-item"><span>' + k + '</span><span>' + v + '</span></div>';
-      });
-      if (!Object.keys(items).length) html += '<div style="font-size:12px;color:#999">데이터 없음</div>';
-      html += '</div></div>';
-    });
-    html += '</div>';
-    document.getElementById('subcatChart').innerHTML = html;
-  } catch (e) { console.error('Subcat error:', e); }
-}
-
-function loadAll() { loadStats(); loadThreads(); loadSubcats(); }
-loadAll();
-setInterval(loadAll, 60000);
-</script>
+    </script>
 </body>
 </html>
